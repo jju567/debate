@@ -3,6 +3,9 @@
 ## Tiedostojen Koko & Refaktorointi
 - **AINA** kun kooditiedosto (esim. Python-ohjelmatiedosto) kasvaa yli **500 rivin**, se on refaktoroitava useampaan pienempään ja selkeämpään tiedostoon (yhden vastuun periaate / moduulijako).
 
+## Projektirakenne & Kansiojako
+- Käytä selkeitä alikansioita erittelemään eri osiot, moduulit, skriptit ja testit (esim. `tests/`, `scripts/`, `src/` tai domain-kohtaiset alikansiot) projektin koon kasvaessa.
+
 ## Python Suoritus & Testaus (Windows)
 - **AINA** käytetään komentoa **`py`** Python-skriptien suorittamiseen (esim. `py main.py`, `py -m uvicorn main:app`). Komento `python` tai `pytest` ei ole suoraan PATH-muuttujassa tässä ympäristössä.
 - Yksikkötestien ajamiseen käytetään:

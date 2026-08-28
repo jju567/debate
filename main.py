@@ -23,6 +23,17 @@ from pydantic import BaseModel
 
 from config import load_agents_config, DEFAULT_EDITOR_MODEL, MAX_HISTORY_MESSAGES
 from llm import stream_chat, LLMError
+from tools import (
+    TOOLS,
+    run_python_code,
+    eval_in_memory,
+    search_web,
+    fetch_webpage_content,
+    read_local_file_content,
+    list_local_directory_contents,
+)
+from library import read_library_document, list_library_documents
+from storage_routes import router as storage_router
 
 load_dotenv()
 
@@ -120,18 +131,6 @@ def conversation_for_model(conv: list[Msg], participant_id_or_model: str, docume
 def sse(obj: dict) -> str:
     return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
-
-from tools import (
-    TOOLS,
-    run_python_code,
-    eval_in_memory,
-    search_web,
-    fetch_webpage_content,
-    read_local_file_content,
-    list_local_directory_contents
-)
-from library import read_library_document, list_library_documents
-from storage_routes import router as storage_router
 
 app.include_router(storage_router)
 
@@ -466,8 +465,6 @@ async def document(req: DocumentRequest):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-# Liitetään dokumenttikirjasto ja aiheiden hallintareitit (storage_routes.py)
-app.include_router(storage_router)
 
 
 @app.post("/api/save")
@@ -499,5 +496,3 @@ if STATIC_DIR.exists():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8002, reload=True)
-
-

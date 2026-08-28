@@ -64,12 +64,18 @@ Avaa selaimessa: **http://localhost:8002**
 
 ## Rakenne
 
-| Tiedosto | Vastuu |
+| Tiedosto / Kansio | Vastuu |
 |---|---|
 | `main.py` | FastAPI-backend, streamaavat SSE-päätepisteet (`/api/respond`, `/api/document`), automaattinen päivitys ja tallennus |
 | `config.py` | Dynaamisen konfiguraation latauslogiikka ja oletusarvot |
 | `agents.json` | Agenttien roolit, `system_prompt`-kehotteet, OpenRouter-mallit ja hinnoittelut |
 | `llm.py` | OpenRouter SSE-streamaus ja token-käytön (usage) sieppaus |
+| `tools.py` | Agenttien työkalut (Python-suoritus, REPL, verkkohaku, tiedostoluku jne.) |
+| `library.py` | Viitedokumenttikirjaston hallinta |
+| `storage_routes.py` | Aiheiden (topics) ja kirjastotiedostojen REST-reitit |
 | `static/index.html` | Käyttöliittymä: agenttivalitsin, chat, token/hintalaskuri ja markdown-dokumenttipaneeli |
+| `scripts/` | Apuskriptit, mallitarkistukset ja yhteyden testiskriptit |
+| `tests/` | Automaattiset yksikkötestit (`py -m unittest discover tests`) |
+| `data/` | Aihetallennukset (`data/topics/`) ja ladatut viitedokumentit (`data/library/`) |
 | `.agents/AGENTS.md` | Agenttien säännöt, Windows `py`-ajotavat ja koodausohjeet |
 
