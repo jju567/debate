@@ -128,6 +128,7 @@
       grid-template-columns: 1fr 1fr;
       flex: 1;
       height: calc(100vh - 65px);
+      min-height: 0;
       overflow: hidden;
     }
 
@@ -138,26 +139,89 @@
       border-right: 1px solid var(--border-color);
       background: #0b0f17;
       height: 100%;
+      min-height: 0;
+      overflow: hidden;
     }
 
     .chat-messages {
       flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
       padding: 20px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      min-height: 0;
+      scroll-behavior: smooth;
+    }
+
+    /* Document Panel */
+    .doc-container {
+      display: flex;
+      flex-direction: column;
+      background: #111827;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .doc-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #e2e8f0;
+      min-height: 0;
     }
 
     .message {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-width: 85%;
-      padding: 12px 16px;
+      max-width: 90%;
+      padding: 12px 18px;
       border-radius: 12px;
-      font-size: 0.92rem;
-      line-height: 1.5;
+      font-size: 0.93rem;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .message-body {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .message-body.rendered-md {
+      white-space: normal;
+    }
+
+    .message-body p { margin-bottom: 0.6em; }
+    .message-body p:last-child { margin-bottom: 0; }
+    .message-body ul, .message-body ol { margin-left: 1.4em; margin-bottom: 0.6em; }
+    .message-body li { margin-bottom: 0.25em; }
+    .message-body strong { color: #f8fafc; font-weight: 600; }
+    .message-body code {
+      font-family: var(--font-mono);
+      background: #111827;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      color: #93c5fd;
+    }
+    .message-body pre {
+      background: #090d16;
+      border: 1px solid var(--border-color);
+      padding: 10px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 0.6em 0;
+    }
+    .message-body pre code {
+      background: transparent;
+      padding: 0;
+      color: #cbd5e1;
     }
 
     .message.user {
@@ -350,6 +414,16 @@
       <span class="logo-icon">🐾</span> AI Design Studio
     </div>
 
+    <!-- Aiheen (Topic) valinta ja hallinta -->
+    <div class="topic-control" style="display: flex; align-items: center; gap: 8px; background: #111827; border: 1px solid var(--border-color); padding: 4px 10px; border-radius: 8px;">
+      <span style="font-size: 0.75rem; color: var(--text-muted);">📁 Aihe:</span>
+      <select id="topic-select" onchange="onTopicSelectChange(this.value)" style="background: #1e293b; color: #f1f5f9; border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; outline: none; cursor: pointer; max-width: 180px;">
+        <option value="default">Oletusaihe</option>
+      </select>
+      <button class="btn-sm" style="padding: 3px 8px; font-size: 0.75rem;" onclick="createNewTopic()" title="Luo uusi suunnitteluaihe">+ Uusi</button>
+      <button class="btn-sm" style="padding: 3px 8px; font-size: 0.75rem;" onclick="renameCurrentTopic()" title="Nimeä aihe uudelleen">✏️</button>
+    </div>
+
     <!-- Osallistujien valinta -->
     <div class="panelist-selector" id="panelist-list">
       <!-- Generoidaan dynaamisesti JS:llä -->
@@ -371,19 +445,27 @@
   <div class="workspace">
     <!-- Chat Paneeli -->
     <div class="chat-container">
+      <div class="chat-header" style="padding: 10px 16px; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">💬 KESKUSTELU</span>
+        <button class="btn-sm" style="font-size: 0.75rem; padding: 4px 8px;" onclick="clearHistory()">Tyhjennä 🗑️</button>
+      </div>
       <div class="chat-messages" id="chat-messages">
         <div class="message assistant">
           <div class="message-header">
             <span class="message-author">Kolli (Pääkoodari)</span>
             <span class="message-model">Järjestelmä</span>
           </div>
-          Tervetuloa AI Design Studioon! Voit valita yläpalkista haluamasi panelistit ja aloittaa järjestelmän suunnittelun. Suunnitteludokumentti päivittyy automaattisesti taustalla kierroksen päätteeksi.
+          <div class="message-body">Tervetuloa AI Design Studioon! Voit valita yläpalkista haluamasi panelistit ja aloittaa järjestelmän suunnittelun. Suunnitteludokumentti päivittyy automaattisesti taustalla kierroksen päätteeksi.</div>
         </div>
       </div>
 
       <div class="chat-input-box">
+        <div class="quick-mention-bar" id="quick-mentions" style="display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap;">
+          <span style="font-size: 0.72rem; color: var(--text-muted);">Kutsu suoraan:</span>
+          <!-- Lisätään dynaamisesti pikavalintanapeilla @seppo, @matti jne. -->
+        </div>
         <div class="chat-input-wrapper">
-          <textarea id="user-input" placeholder="Kirjoita suunnitteluidea tai kysymys paneelille..."></textarea>
+          <textarea id="user-input" placeholder="Kirjoita viesti... Voit kutsua tiettyä asiantuntijaa esim: @seppo, @matti, @aki, @kolli, @legal tai kysyä koko paneelilta"></textarea>
           <button class="btn" id="send-btn" onclick="sendPrompt()">Lähetä 🚀</button>
         </div>
       </div>
@@ -422,6 +504,8 @@
       totalCost: 0.0
     };
 
+    let userProfile = { id: "user", name: "Jarmo", role: "Tuoteomistaja", is_human: true };
+
     // 1. Lataa dynaamiset asetukset
     async function loadConfig() {
       try {
@@ -430,6 +514,7 @@
         participantsConfig = data.participants || {};
         activeParticipants = data.default_active || Object.keys(participantsConfig);
         modelPricing = data.model_pricing || {};
+        if (data.user_profile) userProfile = data.user_profile;
         renderPanelistChips();
       } catch (err) {
         console.error("Configin lataus epäonnistui:", err);
@@ -439,12 +524,54 @@
     function renderPanelistChips() {
       const container = document.getElementById("panelist-list");
       container.innerHTML = "";
+      
+      // Render User Profile Chip (Human)
+      const userChip = document.createElement("div");
+      userChip.className = "panelist-chip active";
+      userChip.style.borderColor = "#10b981";
+      userChip.style.color = "#6ee7b7";
+      userChip.style.background = "rgba(16, 185, 129, 0.15)";
+      userChip.innerHTML = `<span>👤 ${userProfile.name}</span><span class="role-tag">${userProfile.role.split(" ")[0]} (Sinä)</span>`;
+      userChip.title = "Käyttäjän profiili (muokattavissa klikkaamalla)";
+      userChip.onclick = () => editUserProfile();
+      container.appendChild(userChip);
+
       for (const [id, p] of Object.entries(participantsConfig)) {
         const chip = document.createElement("div");
         chip.className = `panelist-chip ${activeParticipants.includes(id) ? "active" : ""}`;
         chip.innerHTML = `<span>${p.name}</span><span class="role-tag">${p.role.split(" ")[0]}</span>`;
         chip.onclick = () => toggleParticipant(id, chip);
         container.appendChild(chip);
+      }
+
+      // Render Quick Mentions Bar
+      const mentionBar = document.getElementById("quick-mentions");
+      if (mentionBar) {
+        mentionBar.innerHTML = `<span style="font-size: 0.72rem; color: var(--text-muted);">Kutsu suoraan:</span>`;
+        for (const [id, p] of Object.entries(participantsConfig)) {
+          const btn = document.createElement("button");
+          btn.className = "btn-sm";
+          btn.style.fontSize = "0.72rem";
+          btn.style.padding = "2px 8px";
+          btn.textContent = `@${p.name}`;
+          btn.title = `Kutsu vain asiantuntijaa ${p.name}`;
+          btn.onclick = () => insertMention(`@${p.name} `);
+          mentionBar.appendChild(btn);
+        }
+      }
+    }
+
+    function insertMention(mentionText) {
+      const input = document.getElementById("user-input");
+      input.value = mentionText + input.value;
+      input.focus();
+    }
+
+    function editUserProfile() {
+      const newName = prompt("Anna nimesi / roolisi nimi:", userProfile.name);
+      if (newName && newName.trim()) {
+        userProfile.name = newName.trim();
+        renderPanelistChips();
       }
     }
 
@@ -490,8 +617,9 @@
       document.getElementById("send-btn").disabled = true;
 
       // Lisää käyttäjän viesti
-      conversation.push({ role: "user", name: "Käyttäjä", content: text });
-      appendMessage("user", "Käyttäjä", "", text);
+      conversation.push({ role: "user", name: userProfile.name, content: text });
+      appendMessage("user", userProfile.name, userProfile.role, text);
+      saveState();
 
       // Valitut panelistit
       const selected = activeParticipants.map(id => participantsConfig[id]).filter(Boolean);
@@ -518,40 +646,61 @@
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n\n");
-          buffer = lines.pop();
+          const chunks = buffer.split("\n\n");
+          buffer = chunks.pop();
 
-          for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const event = JSON.parse(line.substring(6));
-
-            if (event.type === "message_start") {
-              currentAssistantText = "";
-              currentAssistantEl = appendMessage("assistant", event.name, event.role, "");
-            } else if (event.type === "token") {
-              currentAssistantText += event.text;
-              if (currentAssistantEl) {
-                currentAssistantEl.querySelector(".message-body").textContent = currentAssistantText;
+          for (const chunk of chunks) {
+            const lines = chunk.split("\n");
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const jsonStr = trimmed.replace(/^data:\s*/, "");
+              if (!jsonStr || jsonStr === "[DONE]") continue;
+              
+              let event;
+              try {
+                event = JSON.parse(jsonStr);
+              } catch (e) {
+                console.error("JSON parse error:", e, jsonStr);
+                continue;
               }
-              scrollChatToBottom();
-            } else if (event.type === "message_done") {
-              conversation.push({
-                role: "assistant",
-                name: event.name,
-                content: currentAssistantText
-              });
-            } else if (event.type === "usage") {
-              recordUsage(event.model, event.usage);
-            } else if (event.type === "doc_auto_update_start") {
-              const statusEl = document.getElementById("doc-status");
-              statusEl.textContent = "Päivitetään automaattisesti...";
-              statusEl.className = "doc-status updating";
-            } else if (event.type === "doc_auto_update_done") {
-              currentDocument = event.document;
-              renderMarkdown(currentDocument);
-              const statusEl = document.getElementById("doc-status");
-              statusEl.textContent = "Ajantasainen";
-              statusEl.className = "doc-status";
+
+              if (event.type === "message_start") {
+                currentAssistantText = "";
+                currentAssistantEl = appendMessage("assistant", event.name, event.role, "");
+              } else if (event.type === "token") {
+                currentAssistantText += event.text;
+                updateStreamingMessage(currentAssistantEl, currentAssistantText);
+              } else if (event.type === "error") {
+                console.error("Virhe palvelimelta:", event.text);
+                appendMessage("assistant", event.name || "Virhe", "Järjestelmävirhe", `⚠️ ${event.text}`);
+              } else if (event.type === "message_done") {
+                if (currentAssistantEl) {
+                  updateStreamingMessage(currentAssistantEl, currentAssistantText);
+                }
+                conversation.push({
+                  role: "assistant",
+                  name: event.name,
+                  content: currentAssistantText
+                });
+                saveState();
+              } else if (event.type === "usage") {
+                recordUsage(event.model, event.usage);
+                saveState();
+              } else if (event.type === "doc_auto_update_start") {
+                const statusEl = document.getElementById("doc-status");
+                statusEl.textContent = "Päivitetään automaattisesti...";
+                statusEl.className = "doc-status updating";
+              } else if (event.type === "doc_auto_update_done") {
+                if (event.document && event.document.trim()) {
+                  currentDocument = event.document;
+                  renderMarkdown(currentDocument);
+                  saveState();
+                }
+                const statusEl = document.getElementById("doc-status");
+                statusEl.textContent = "Ajantasainen";
+                statusEl.className = "doc-status";
+              }
             }
           }
         }
@@ -566,21 +715,44 @@
       const chat = document.getElementById("chat-messages");
       const msg = document.createElement("div");
       msg.className = `message ${role}`;
+      
+      let renderedContent = text;
+      if (text && typeof marked !== "undefined") {
+        renderedContent = marked.parse(text);
+      }
+
       msg.innerHTML = `
         <div class="message-header">
           <span class="message-author">${name}</span>
           <span class="message-model">${subtitle}</span>
         </div>
-        <div class="message-body">${text}</div>
+        <div class="message-body ${text ? 'rendered-md' : ''}">${renderedContent}</div>
       `;
       chat.appendChild(msg);
       scrollChatToBottom();
       return msg;
     }
 
+    function updateStreamingMessage(msgEl, text) {
+      if (!msgEl) return;
+      const bodyEl = msgEl.querySelector(".message-body");
+      if (typeof marked !== "undefined") {
+        bodyEl.innerHTML = marked.parse(text);
+        bodyEl.className = "message-body rendered-md";
+      } else {
+        bodyEl.textContent = text;
+      }
+      scrollChatToBottom();
+    }
+
     function scrollChatToBottom() {
       const chat = document.getElementById("chat-messages");
+      if (!chat) return;
       chat.scrollTop = chat.scrollHeight;
+      const lastChild = chat.lastElementChild;
+      if (lastChild) {
+        lastChild.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
     }
 
     function renderMarkdown(md) {
@@ -616,8 +788,250 @@
       }
     }
 
+    let currentTopicId = "default";
+    let currentTopicTitle = "Oletusaihe";
+    let topicsList = [];
+
+    async function loadTopics() {
+      try {
+        const res = await fetch("/api/topics");
+        const data = await res.json();
+        topicsList = data.topics || [];
+        renderTopicSelect();
+      } catch (e) {
+        console.error("Aiheiden lataus epäonnistui:", e);
+      }
+    }
+
+    function renderTopicSelect() {
+      const select = document.getElementById("topic-select");
+      if (!select) return;
+      select.innerHTML = "";
+      
+      if (topicsList.length === 0) {
+        const opt = document.createElement("option");
+        opt.value = "default";
+        opt.textContent = "Oletusaihe";
+        select.appendChild(opt);
+        return;
+      }
+
+      for (const t of topicsList) {
+        const opt = document.createElement("option");
+        opt.value = t.id;
+        opt.textContent = t.title;
+        if (t.id === currentTopicId) opt.selected = true;
+        select.appendChild(opt);
+      }
+    }
+
+    async function onTopicSelectChange(topicId) {
+      if (topicId === currentTopicId) return;
+      // Tallennetaan ensin nykyinen aihe
+      await syncTopicToBackend();
+      // Ladataan uusi aihe
+      await switchTopic(topicId);
+    }
+
+    async function switchTopic(topicId) {
+      try {
+        const res = await fetch(`/api/topics/${topicId}`);
+        const data = await res.json();
+        if (data && data.id) {
+          currentTopicId = data.id;
+          currentTopicTitle = data.title;
+          conversation = (data.conversation || []).map(m => ({
+            role: m.role,
+            name: m.name,
+            content: m.content,
+            model: m.model
+          }));
+          currentDocument = data.document || "";
+          stats = data.stats || { promptTokens: 0, completionTokens: 0, totalTokens: 0, totalCost: 0.0 };
+
+          // Päivitä chat UI
+          const chat = document.getElementById("chat-messages");
+          chat.innerHTML = "";
+          if (conversation.length === 0) {
+            chat.innerHTML = `
+              <div class="message assistant">
+                <div class="message-header">
+                  <span class="message-author">Kolli (Pääkoodari)</span>
+                  <span class="message-model">Järjestelmä</span>
+                </div>
+                <div class="message-body">Aihe <strong>${currentTopicTitle}</strong> avattu. Aloita keskustelu!</div>
+              </div>
+            `;
+          } else {
+            for (const m of conversation) {
+              const subtitle = m.role === "user" ? (userProfile.role || "") : "";
+              appendMessage(m.role, m.name, subtitle, m.content);
+            }
+          }
+
+          // Päivitä doc ja stats UI
+          renderMarkdown(currentDocument);
+          document.getElementById("total-tokens").textContent = (stats.totalTokens || 0).toLocaleString();
+          document.getElementById("total-cost").textContent = `$${(stats.totalCost || 0).toFixed(4)}`;
+
+          saveState();
+          renderTopicSelect();
+        }
+      } catch (e) {
+        console.error("Aiheen vaihto epäonnistui:", e);
+      }
+    }
+
+    async function createNewTopic() {
+      const title = prompt("Anna uudelle aiheelle otsikko / nimi (esim. 'Reaaliaikainen OBI-filtteri'):");
+      if (!title || !title.trim()) return;
+
+      await syncTopicToBackend(); // talleta vanha
+
+      const id = "topic_" + Date.now().toString(36);
+      currentTopicId = id;
+      currentTopicTitle = title.trim();
+      conversation = [];
+      currentDocument = "";
+      stats = { promptTokens: 0, completionTokens: 0, totalTokens: 0, totalCost: 0.0 };
+
+      // Nollaa UI
+      const chat = document.getElementById("chat-messages");
+      chat.innerHTML = `
+        <div class="message assistant">
+          <div class="message-header">
+            <span class="message-author">Kolli (Pääkoodari)</span>
+            <span class="message-model">Järjestelmä</span>
+          </div>
+          <div class="message-body">Uusi aihe <strong>${currentTopicTitle}</strong> luotu. Mistä aloitetaan?</div>
+        </div>
+      `;
+      document.getElementById("doc-content").innerHTML = "<em>Dokumentti luodaan ensimmäisen paneelikierroksen jälkeen...</em>";
+      document.getElementById("total-tokens").textContent = "0";
+      document.getElementById("total-cost").textContent = "$0.0000";
+
+      await syncTopicToBackend();
+      await loadTopics();
+      saveState();
+    }
+
+    async function renameCurrentTopic() {
+      const newTitle = prompt("Anna aiheelle uusi nimi:", currentTopicTitle);
+      if (!newTitle || !newTitle.trim()) return;
+      currentTopicTitle = newTitle.trim();
+      await syncTopicToBackend();
+      await loadTopics();
+    }
+
+    async function syncTopicToBackend() {
+      try {
+        await fetch("/api/topics/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: currentTopicId,
+            title: currentTopicTitle,
+            conversation: conversation,
+            document: currentDocument,
+            stats: stats
+          })
+        });
+      } catch (e) {
+        console.error("Aiheen synkronointi backendin data/-kansioon epäonnistui:", e);
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem("ai_studio_conv", JSON.stringify(conversation));
+        localStorage.setItem("ai_studio_doc", currentDocument);
+        localStorage.setItem("ai_studio_stats", JSON.stringify(stats));
+        localStorage.setItem("ai_studio_active_participants", JSON.stringify(activeParticipants));
+        localStorage.setItem("ai_studio_user_profile", JSON.stringify(userProfile));
+        localStorage.setItem("ai_studio_current_topic_id", currentTopicId);
+        localStorage.setItem("ai_studio_current_topic_title", currentTopicTitle);
+        // Tallennetaan samalla myös taustalle data/topics -tiedostoksi
+        syncTopicToBackend();
+      } catch (e) {
+        console.error("Tallennus localStorageen epäonnistui:", e);
+      }
+    }
+
+    function restoreState() {
+      try {
+        const savedTopicId = localStorage.getItem("ai_studio_current_topic_id");
+        if (savedTopicId) currentTopicId = savedTopicId;
+        const savedTopicTitle = localStorage.getItem("ai_studio_current_topic_title");
+        if (savedTopicTitle) currentTopicTitle = savedTopicTitle;
+
+        const savedConv = localStorage.getItem("ai_studio_conv");
+        if (savedConv) {
+          conversation = JSON.parse(savedConv);
+          if (conversation.length > 0) {
+            const chat = document.getElementById("chat-messages");
+            chat.innerHTML = "";
+            for (const m of conversation) {
+              const subtitle = m.role === "user" ? (userProfile.role || "") : "";
+              appendMessage(m.role, m.name, subtitle, m.content);
+            }
+          }
+        }
+
+        const savedDoc = localStorage.getItem("ai_studio_doc");
+        if (savedDoc) {
+          currentDocument = savedDoc;
+          renderMarkdown(currentDocument);
+        }
+
+        const savedStats = localStorage.getItem("ai_studio_stats");
+        if (savedStats) {
+          stats = JSON.parse(savedStats);
+          document.getElementById("total-tokens").textContent = (stats.totalTokens || 0).toLocaleString();
+          document.getElementById("total-cost").textContent = `$${(stats.totalCost || 0).toFixed(4)}`;
+        }
+
+        const savedActive = localStorage.getItem("ai_studio_active_participants");
+        if (savedActive) {
+          activeParticipants = JSON.parse(savedActive);
+        }
+
+        const savedUser = localStorage.getItem("ai_studio_user_profile");
+        if (savedUser) {
+          userProfile = JSON.parse(savedUser);
+        }
+      } catch (e) {
+        console.error("Palautus localStoragesta epäonnistui:", e);
+      }
+    }
+
+    function clearHistory() {
+      if (!confirm(`Haluatko varmasti tyhjentää aiheen "${currentTopicTitle}" sisällön?`)) return;
+      conversation = [];
+      currentDocument = "";
+      stats = { promptTokens: 0, completionTokens: 0, totalTokens: 0, totalCost: 0.0 };
+      
+      const chat = document.getElementById("chat-messages");
+      chat.innerHTML = `
+        <div class="message assistant">
+          <div class="message-header">
+            <span class="message-author">Kolli (Pääkoodari)</span>
+            <span class="message-model">Järjestelmä</span>
+          </div>
+          <div class="message-body">Aiheen sisältö nollattu. Voit aloittaa uuden keskustelun!</div>
+        </div>
+      `;
+      document.getElementById("doc-content").innerHTML = "<em>Dokumentti luodaan ja päivitetään automaattisesti ensimmäisen paneelikierroksen jälkeen...</em>";
+      document.getElementById("total-tokens").textContent = "0";
+      document.getElementById("total-cost").textContent = "$0.0000";
+      saveState();
+    }
+
     // Käynnistys
-    loadConfig();
+    loadConfig().then(async () => {
+      restoreState();
+      renderPanelistChips();
+      await loadTopics();
+    });
 
     // Enter-lähetys
     document.getElementById("user-input").addEventListener("keydown", (e) => {

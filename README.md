@@ -8,6 +8,9 @@ Kaikki mallit kulkevat yhden **OpenRouter**-avaimen kautta, joten voit sekoittaa
 
 ## Ominaisuudet
 
+- **Työkalujen Suoritus (Tool Calling / Code Execution)**: Agenteilla (kuten Kolli ja Matti) on mahdollisuus suorittaa Python-koodia suoraan palvelimella (`execute_python`) matemaattisten kaavojen, algoritmien tai skriptien validoimiseksi.
+- **Aiheiden Hallinta & Tallennus (`data/topics/`)**: Keskustelut, dokumenttiluonnokset ja token-tilastot tallentuvat automaattisesti aihekohtaisesti. Voit luoda uusia aiheita, nimetä niitä ja vaihtaa vanhojen aiheiden välillä suoraan käyttöliittymästä.
+- **Täsmäkutsu (@mention)**: Voit kutsua asiantuntijoita suoraan nimellä (esim. `@kolli`, `@matti`, `@aki`), jolloin vain mainitut agentit vastaavat ja turha automaattinen kehä vältetään.
 - **Dynaamiset Agentit & Roolit**: Agenttien roolit, mallit ja järjestelmäkehotteet määritellään tiedostossa [`agents.json`](agents.json). Uusien agenttien lisäys onnistuu suoraan JSONia muokkaamalla.
 - **Tuki Ilmaisille Malleille (`:free`)**: Oletuskonfiguraatio käyttää OpenRouterin ilmaisia huippumalleja (Llama 3.3 70B, DeepSeek R1, Gemini Flash Thinking, Qwen 2.5 Coder jne.).
 - **Liukuva Ikkuna (Sliding Window)**: `conversation_for_model` rajaa historian vain viimeisiin aktiivisiin viesteihin, estäen token-kontekstin ja kustannusten hallitsemattoman kasvun.
@@ -41,13 +44,13 @@ Hanki API-avain: https://openrouter.ai/keys
 
 ```powershell
 # Vaihtoehto A:
-py -3 -m uvicorn main:app --reload --port 8000
+py -3 -m uvicorn main:app --reload --port 8002
 
 # Vaihtoehto B:
 py -3 main.py
 ```
 
-Avaa selaimessa: **http://localhost:8000**
+Avaa selaimessa: **http://localhost:8002**
 
 ---
 

@@ -15,8 +15,8 @@ class LLMError(Exception):
     """OpenRouter-kutsu epäonnistui."""
 
 
-async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api_key: str):
-    """Async-generaattori, joka tuottaa tekstipaloja yhdeltä mallilta.
+async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api_key: str, tools: list | None = None):
+    """Async-generaattori, joka tuottaa tekstipaloja ja työkalukutsuja yhdeltä mallilta.
 
     Heittää LLMError-poikkeuksen jos kutsu epäonnistuu.
     """
@@ -26,11 +26,14 @@ async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api
         "stream": True,
         "stream_options": {"include_usage": True},
     }
+    if tools:
+        payload["tools"] = tools
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         # OpenRouter suosittelee näitä tunnistautumisen/tilastoinnin vuoksi.
-        "HTTP-Referer": "http://localhost:8000",
+        "HTTP-Referer": "http://localhost:8002",
         "X-Title": "AI Design Studio",
     }
 
@@ -59,7 +62,15 @@ async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api
 
             choices = obj.get("choices") or [{}]
             delta = choices[0].get("delta") or {}
+            
+            # Handle text content
             chunk = delta.get("content")
             if chunk:
                 yield {"type": "text", "text": chunk}
+
+            # Handle tool calls
+            tool_calls = delta.get("tool_calls")
+            if tool_calls:
+                yield {"type": "tool_calls", "tool_calls": tool_calls}
+
 

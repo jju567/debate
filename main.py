@@ -17,7 +17,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -29,6 +29,7 @@ load_dotenv()
 app = FastAPI(title="AI Design Studio")
 
 DOCS_DIR = Path(__file__).parent / "documents"
+DATA_DIR = Path(__file__).parent / "data"
 STATIC_DIR = Path(__file__).parent / "static"
 
 
@@ -50,6 +51,7 @@ class Participant(BaseModel):
 
 
 class RespondRequest(BaseModel):
+    topic_id: str | None = "default"
     conversation: list[Msg] = []
     participants: list[Participant] | None = None
     document: str = ""
@@ -58,12 +60,21 @@ class RespondRequest(BaseModel):
     max_history: int | None = None
 
 
-
 class DocumentRequest(BaseModel):
+    topic_id: str | None = "default"
     conversation: list[Msg] = []
     document: str = ""
     instruction: str = ""
     editor_model: str = DEFAULT_EDITOR_MODEL
+
+
+class TopicSaveRequest(BaseModel):
+    id: str
+    title: str
+    conversation: list[Msg] = []
+    document: str = ""
+    summary: str = ""
+    stats: dict = {}
 
 
 class SaveRequest(BaseModel):
@@ -110,11 +121,22 @@ def sse(obj: dict) -> str:
     return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
 
+from tools import TOOLS, run_python_code, eval_in_memory
+
 # ---------- Päätepisteet ----------
+
+@app.post("/api/tools/execute")
+async def execute_code_api(payload: dict):
+    """Suora päätepiste Python-koodin ajamiseen (tukee myös pikaevaluointia)."""
+    code = payload.get("code", "")
+    use_fast = payload.get("fast", False)
+    if use_fast:
+        return eval_in_memory(code)
+    return run_python_code(code)
 
 @app.get("/api/config")
 async def get_config():
-    """Palauta ajantasainen agenttikonfiguraatio agents.json-tiedostosta."""
+    """Palauta ajantasainen agenttikonfiguraatio ja käyttäjäprofiili agents.json-tiedostosta."""
     cfg = load_agents_config()
     return {
         "participants": cfg["participants"],
@@ -122,24 +144,54 @@ async def get_config():
         "editor_model": cfg["editor_model"],
         "max_history_messages": cfg["max_history_messages"],
         "model_pricing": cfg.get("model_pricing", {}),
+        "user_profile": cfg.get("user_profile", {
+            "id": "user",
+            "name": "Käyttäjä",
+            "role": "Tuoteomistaja",
+            "is_human": True
+        }),
     }
 
 
 @app.post("/api/respond")
 async def respond(req: RespondRequest):
-    """Valitut osallistujat vastaavat vuorotellen omilla rooleillaan ja malleillaan.
+    """Valitut osallistujat vastaavat tarpeen mukaan (suora kutsu @nimellä tai valittu paneeli).
     
     Kierroksen päätteeksi päivitetään automaattisesti suunnitteludokumentti (jos auto_update_doc=True).
     """
     api_key = os.environ.get("OPENROUTER_API_KEY")
     cfg = load_agents_config()
+    participants_dict = cfg["participants"]
 
-    # Määritetään osallistujalista joko pyynnöstä tai suoraan dynaamisesta konfiguraatiosta
+    # Tarkistetaan viimeisimmästä käyttäjän viestistä mahdolliset suorat @kutsut (esim. @seppo, @matti, "Seppo, ...")
+    last_user_msg = ""
+    for m in reversed(req.conversation):
+        if m.role == "user":
+            last_user_msg = m.content.lower()
+            break
+
+    # Etsitään mainitut agentit
+    mentioned_ids = []
+    for pid, p in participants_dict.items():
+        name_lower = p["name"].lower()
+        if f"@{pid}" in last_user_msg or f"@{name_lower}" in last_user_msg or last_user_msg.startswith(f"{name_lower},") or last_user_msg.startswith(f"{name_lower}:"):
+            mentioned_ids.append(pid)
+
+    # Määritetään vastaajat: jos käyttäjä kutsui suoraan tiettyä agenttia/agentteja, vastataan vain heille!
     selected_participants: list[Participant] = []
-    if req.participants:
+    if mentioned_ids:
+        for pid in mentioned_ids:
+            p = participants_dict[pid]
+            selected_participants.append(Participant(
+                id=p["id"],
+                name=p["name"],
+                role=p["role"],
+                model=p["model"],
+                system_prompt=p.get("system_prompt")
+            ))
+    elif req.participants:
         selected_participants = req.participants
     else:
-        participants_dict = cfg["participants"]
         for pid in cfg["default_active"]:
             if pid in participants_dict:
                 p = participants_dict[pid]
@@ -165,7 +217,7 @@ async def respond(req: RespondRequest):
         working = list(req.conversation)
 
         async with httpx.AsyncClient() as client:
-            # 1. Paneelikierros: Jokainen osallistuja vastaa vuorollaan
+            # 1. Osallistujat vastaavat
             for p in selected_participants:
                 yield sse({
                     "type": "message_start",
@@ -176,19 +228,23 @@ async def respond(req: RespondRequest):
                 })
                 
                 system_prompt = p.system_prompt or (
-                    f"Olet {p.name}, rooliltasi {p.role}. Osallistut järjestelmäsuunnittelupaneeliin. "
+                    f"Olet {p.name}, rooliltasi {p.role}. Osallistut järjestelmäsuunnitteluun. "
                     "Keskustele rakentavasti ja vie asioita eteenpäin tiiviisti suomeksi."
                 )
                 messages = [{"role": "system", "content": system_prompt}]
                 messages += conversation_for_model(working, p.id, req.document, window_size=window_size)
                 
                 parts: list[str] = []
+                tool_calls_accumulator = []
                 try:
-                    async for event in stream_chat(client, p.model, messages, api_key):
+                    # Mallille annetaan työkalut (esim. execute_python)
+                    async for event in stream_chat(client, p.model, messages, api_key, tools=TOOLS):
                         if event["type"] == "text":
                             chunk = event["text"]
                             parts.append(chunk)
                             yield sse({"type": "token", "id": p.id, "name": p.name, "text": chunk})
+                        elif event["type"] == "tool_calls":
+                            tool_calls_accumulator.extend(event["tool_calls"])
                         elif event["type"] == "usage":
                             yield sse({
                                 "type": "usage",
@@ -197,6 +253,36 @@ async def respond(req: RespondRequest):
                                 "model": p.model,
                                 "usage": event["usage"]
                             })
+
+                    # Jos malli kutsui työkalua (esim. suoritti Python-koodia)
+                    if tool_calls_accumulator:
+                        yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n\n⚡ *[Suoritetaan Python-koodia...]*\n"})
+                        for tc in tool_calls_accumulator:
+                            fn = tc.get("function", {})
+                            fn_name = fn.get("name")
+                            args_str = fn.get("arguments", "{}")
+                            try:
+                                args = json.loads(args_str) if isinstance(args_str, str) else args_str
+                            except Exception:
+                                args = {}
+
+                            if fn_name == "execute_python":
+                                code_to_run = args.get("code", "")
+                                yield sse({
+                                    "type": "tool_executed",
+                                    "tool": "execute_python",
+                                    "code": code_to_run
+                                })
+                                res = run_python_code(code_to_run)
+                                output_text = res["output"]
+                                parts.append(f"\n```python\n# Suoritettu koodi:\n{code_to_run}\n```\n**Tuloste:**\n```\n{output_text}\n```\n")
+                                yield sse({
+                                    "type": "token",
+                                    "id": p.id,
+                                    "name": p.name,
+                                    "text": f"\n```python\n# Suoritettu koodi:\n{code_to_run}\n```\n**Tuloste:**\n```\n{output_text}\n```\n"
+                                })
+
                 except LLMError as e:
                     err = f"[Virhe osallistujalta {p.name}: {e}]"
                     parts.append(err)
@@ -235,10 +321,14 @@ async def respond(req: RespondRequest):
                                 "model": editor_model,
                                 "usage": event["usage"]
                             })
-                    updated_doc = "".join(doc_parts)
-                    yield sse({"type": "doc_auto_update_done", "document": updated_doc})
+                    updated_doc = "".join(doc_parts).strip()
+                    if updated_doc:
+                        yield sse({"type": "doc_auto_update_done", "document": updated_doc})
+                    else:
+                        yield sse({"type": "doc_auto_update_done", "document": req.document})
                 except LLMError as e:
                     yield sse({"type": "error", "text": f"Dokumentin automaattipäivitys epäonnistui: {e}"})
+                    yield sse({"type": "doc_auto_update_done", "document": req.document})
 
         yield sse({"type": "done"})
 
@@ -294,6 +384,76 @@ async def document(req: DocumentRequest):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+# ---------- Aiheiden (Topics) hallinta ----------
+
+def get_topics_dir() -> Path:
+    topics_dir = DATA_DIR / "topics"
+    topics_dir.mkdir(parents=True, exist_ok=True)
+    return topics_dir
+
+
+@app.get("/api/topics")
+async def list_topics():
+    """Listaa kaikki tallennetut aiheet ja niiden metatiedot."""
+    td = get_topics_dir()
+    topics = []
+    for p in td.glob("*.json"):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                topics.append({
+                    "id": data.get("id", p.stem),
+                    "title": data.get("title", p.stem),
+                    "summary": data.get("summary", ""),
+                    "updated_at": data.get("updated_at", ""),
+                    "msg_count": len(data.get("conversation", [])),
+                })
+        except Exception:
+            continue
+    # Järjestetään uusimmat ensin
+    topics.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+    return {"topics": topics}
+
+
+@app.get("/api/topics/{topic_id}")
+async def get_topic(topic_id: str):
+    """Hae tietyn aiheen koko tila (keskustelu, dokumentti, tilastot)."""
+    safe_id = re.sub(r"[^A-Za-z0-9_.\- ]", "_", topic_id).strip()
+    path = get_topics_dir() / f"{safe_id}.json"
+    if not path.exists():
+        return {"error": "Aihetta ei löydy"}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+@app.post("/api/topics/save")
+async def save_topic(req: TopicSaveRequest):
+    """Tallenna aihe ja sen tiivistetty tila data/topics -kansioon."""
+    td = get_topics_dir()
+    safe_id = re.sub(r"[^A-Za-z0-9_.\- ]", "_", req.id).strip() or "aihe_1"
+    path = td / f"{safe_id}.json"
+    
+    # Luodaan lyhyt tiivistelmä jos ei annettu
+    summary = req.summary
+    if not summary and req.conversation:
+        last_msgs = [m.content for m in req.conversation if m.role == "user"]
+        summary = (last_msgs[-1][:120] + "...") if last_msgs else req.title
+
+    import datetime
+    topic_data = {
+        "id": safe_id,
+        "title": req.title.strip() or safe_id,
+        "summary": summary,
+        "conversation": [m.dict() for m in req.conversation],
+        "document": req.document,
+        "stats": req.stats,
+        "updated_at": datetime.datetime.now().isoformat(),
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(topic_data, f, ensure_ascii=False, indent=2)
+    return {"ok": True, "topic": topic_data}
+
+
 @app.post("/api/save")
 async def save(req: SaveRequest):
     """Tallenna dokumentti paikallisesti documents/-kansioon."""
@@ -306,11 +466,22 @@ async def save(req: SaveRequest):
     return {"ok": True, "path": str(path)}
 
 
-# Palvele käyttöliittymä (rekisteröidään API-reittien jälkeen).
-app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
+@app.get("/")
+async def root():
+    """Palvele etusivun käyttöliittymä."""
+    index_path = STATIC_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return {"message": "AI Design Studio Backend Running. static/index.html not found."}
+
+
+# Palvele staattiset tiedostot (CSS, JS, kuvat)
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8002, reload=True)
+
 

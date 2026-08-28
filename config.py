@@ -75,18 +75,30 @@ def load_agents_config() -> dict:
                 return {
                     "participants": data.get("participants", FALLBACK_PARTICIPANTS),
                     "default_active": data.get("default_active", list(FALLBACK_PARTICIPANTS.keys())[:4]),
-                    "editor_model": data.get("editor_model", "anthropic/claude-3.5-sonnet"),
+                    "editor_model": data.get("editor_model", "openrouter/free"),
                     "max_history_messages": data.get("max_history_messages", 10),
                     "model_pricing": data.get("model_pricing", {}),
+                    "user_profile": data.get("user_profile", {
+                        "id": "user",
+                        "name": "Käyttäjä",
+                        "role": "Tuoteomistaja",
+                        "is_human": True
+                    }),
                 }
         except Exception:
             pass
     return {
         "participants": FALLBACK_PARTICIPANTS,
         "default_active": ["seppo", "matti", "aki", "kolli"],
-        "editor_model": "anthropic/claude-3.5-sonnet",
+        "editor_model": "openrouter/free",
         "max_history_messages": 10,
         "model_pricing": {},
+        "user_profile": {
+            "id": "user",
+            "name": "Käyttäjä",
+            "role": "Tuoteomistaja",
+            "is_human": True
+        },
     }
 
 
