@@ -4,3 +4,8 @@ __pycache__/
 .venv/
 venv/
 documents/
+data/
+scripts/
+*.log
+test_*.py
+inspect_*.py
