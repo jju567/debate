@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Design Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #0f141c;
+      --bg-card: #18202c;
+      --bg-card-alt: #1e293b;
+      --border-color: #2e3c51;
+      --accent-blue: #3b82f6;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Bar */
+    header {
+      background: rgba(24, 32, 44, 0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 15px;
+      z-index: 10;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      background: linear-gradient(135deg, #60a5fa, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand .logo-icon {
+      font-size: 1.3rem;
+      -webkit-text-fill-color: initial;
+    }
+
+    /* Panelist Selector */
+    .panelist-selector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .panelist-chip {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border-color);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .panelist-chip.active {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: var(--accent-blue);
+      color: #93c5fd;
+      font-weight: 500;
+    }
+
+    .panelist-chip .role-tag {
+      font-size: 0.72rem;
+      opacity: 0.7;
+    }
+
+    /* Token & Cost Counter Bar */
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: #111827;
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-label { color: var(--text-muted); font-size: 0.72rem; }
+    .stat-val { font-weight: 600; color: #38bdf8; }
+    .stat-val.cost { color: #34d399; }
+
+    /* Main Workspace Layout */
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      flex: 1;
+      height: calc(100vh - 65px);
+      overflow: hidden;
+    }
+
+    /* Chat Panel */
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border-color);
+      background: #0b0f17;
+      height: 100%;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: #1e3a5f;
+      border: 1px solid #2563eb;
+      color: #eff6ff;
+    }
+
+    .message.assistant {
+      align-self: flex-start;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+    }
+
+    .message-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 4px;
+      margin-bottom: 4px;
+    }
+
+    .message-author { font-weight: 600; color: #60a5fa; }
+    .message-model { font-family: var(--font-mono); font-size: 0.7rem; opacity: 0.6; }
+
+    .chat-input-box {
+      padding: 16px;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .chat-input-wrapper {
+      display: flex;
+      gap: 10px;
+    }
+
+    textarea {
+      flex: 1;
+      background: #0d121c;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-family: var(--font-main);
+      font-size: 0.92rem;
+      padding: 10px 14px;
+      border-radius: 8px;
+      resize: none;
+      height: 60px;
+      outline: none;
+    }
+    textarea:focus { border-color: var(--accent-blue); }
+
+    .btn {
+      background: var(--accent-blue);
+      color: white;
+      border: none;
+      padding: 0 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn:hover { background: #2563eb; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Document Panel */
+    .doc-container {
+      display: flex;
+      flex-direction: column;
+      background: #111827;
+      height: 100%;
+    }
+
+    .doc-header {
+      padding: 12px 20px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .doc-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .doc-status {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: #064e3b;
+      color: #6ee7b7;
+    }
+
+    .doc-status.updating {
+      background: #78350f;
+      color: #fde68a;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    .doc-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-sm {
+      background: var(--bg-card-alt);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .btn-sm:hover { background: #334155; }
+
+    .doc-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    .doc-content h1, .doc-content h2, .doc-content h3 {
+      color: #f8fafc;
+      margin-top: 1.2em;
+      margin-bottom: 0.6em;
+    }
+    .doc-content h1 { font-size: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 6px; }
+    .doc-content h2 { font-size: 1.25rem; }
+    .doc-content p { margin-bottom: 1em; }
+    .doc-content ul, .doc-content ol { margin-left: 20px; margin-bottom: 1em; }
+    .doc-content code {
+      font-family: var(--font-mono);
+      background: #1e293b;
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-size: 0.88em;
+    }
+    .doc-content pre code {
+      display: block;
+      padding: 12px;
+      overflow-x: auto;
+      background: #0a0f18;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      margin-bottom: 1em;
+    }
+
+    /* Cost Tooltip / Breakdown modal */
+    .cost-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      color: #34d399;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span class="logo-icon">🐾</span> AI Design Studio
+    </div>
+
+    <!-- Osallistujien valinta -->
+    <div class="panelist-selector" id="panelist-list">
+      <!-- Generoidaan dynaamisesti JS:llä -->
+    </div>
+
+    <!-- Token- ja Hintalaskuri -->
+    <div class="stats-bar" id="stats-bar" title="Kokonaiskulutus tältä istunnolta">
+      <div class="stat-item">
+        <span class="stat-label">TOKENS:</span>
+        <span class="stat-val" id="total-tokens">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">HINTA:</span>
+        <span class="stat-val cost" id="total-cost">$0.0000</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <!-- Chat Paneeli -->
+    <div class="chat-container">
+      <div class="chat-messages" id="chat-messages">
+        <div class="message assistant">
+          <div class="message-header">
+            <span class="message-author">Kolli (Pääkoodari)</span>
+            <span class="message-model">Järjestelmä</span>
+          </div>
+          Tervetuloa AI Design Studioon! Voit valita yläpalkista haluamasi panelistit ja aloittaa järjestelmän suunnittelun. Suunnitteludokumentti päivittyy automaattisesti taustalla kierroksen päätteeksi.
+        </div>
+      </div>
+
+      <div class="chat-input-box">
+        <div class="chat-input-wrapper">
+          <textarea id="user-input" placeholder="Kirjoita suunnitteluidea tai kysymys paneelille..."></textarea>
+          <button class="btn" id="send-btn" onclick="sendPrompt()">Lähetä 🚀</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dokumentti Paneeli -->
+    <div class="doc-container">
+      <div class="doc-header">
+        <div class="doc-title">
+          📄 Suunnitteludokumentti
+          <span class="doc-status" id="doc-status">Ajantasainen</span>
+        </div>
+        <div class="doc-actions">
+          <button class="btn-sm" onclick="exportMarkdown()">Kopioi MD</button>
+          <button class="btn-sm" onclick="saveDocument()">Tallenna 💾</button>
+        </div>
+      </div>
+      <div class="doc-content" id="doc-content">
+        <em>Dokumentti luodaan ja päivitetään automaattisesti ensimmäisen paneelikierroksen jälkeen...</em>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let participantsConfig = {};
+    let activeParticipants = [];
+    let modelPricing = {};
+    let conversation = [];
+    let currentDocument = "";
+    
+    // Token & Cost Tracking
+    let stats = {
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0,
+      totalCost: 0.0
+    };
+
+    // 1. Lataa dynaamiset asetukset
+    async function loadConfig() {
+      try {
+        const res = await fetch("/api/config");
+        const data = await res.json();
+        participantsConfig = data.participants || {};
+        activeParticipants = data.default_active || Object.keys(participantsConfig);
+        modelPricing = data.model_pricing || {};
+        renderPanelistChips();
+      } catch (err) {
+        console.error("Configin lataus epäonnistui:", err);
+      }
+    }
+
+    function renderPanelistChips() {
+      const container = document.getElementById("panelist-list");
+      container.innerHTML = "";
+      for (const [id, p] of Object.entries(participantsConfig)) {
+        const chip = document.createElement("div");
+        chip.className = `panelist-chip ${activeParticipants.includes(id) ? "active" : ""}`;
+        chip.innerHTML = `<span>${p.name}</span><span class="role-tag">${p.role.split(" ")[0]}</span>`;
+        chip.onclick = () => toggleParticipant(id, chip);
+        container.appendChild(chip);
+      }
+    }
+
+    function toggleParticipant(id, chip) {
+      if (activeParticipants.includes(id)) {
+        if (activeParticipants.length <= 1) return; // pidetään vähintään 1 aktiivisena
+        activeParticipants = activeParticipants.filter(x => x !== id);
+        chip.classList.remove("active");
+      } else {
+        activeParticipants.push(id);
+        chip.classList.add("active");
+      }
+    }
+
+    // 2. Tokenien ja hinnan laskenta
+    function recordUsage(model, usage) {
+      if (!usage) return;
+      const pTokens = usage.prompt_tokens || 0;
+      const cTokens = usage.completion_tokens || 0;
+      const total = usage.total_tokens || (pTokens + cTokens);
+
+      stats.promptTokens += pTokens;
+      stats.completionTokens += cTokens;
+      stats.totalTokens += total;
+
+      // Hinta OpenRouter-hinnoittelun perusteella ($ / 1M tokenia)
+      const pricing = modelPricing[model] || modelPricing["default"] || { prompt: 1.0, completion: 3.0 };
+      const cost = ((pTokens / 1_000_000) * pricing.prompt) + ((cTokens / 1_000_000) * pricing.completion);
+      stats.totalCost += cost;
+
+      // Päivitä UI
+      document.getElementById("total-tokens").textContent = stats.totalTokens.toLocaleString();
+      document.getElementById("total-cost").textContent = `$${stats.totalCost.toFixed(4)}`;
+    }
+
+    // 3. Viestin lähetys ja SSE-striimaus
+    async function sendPrompt() {
+      const input = document.getElementById("user-input");
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = "";
+      document.getElementById("send-btn").disabled = true;
+
+      // Lisää käyttäjän viesti
+      conversation.push({ role: "user", name: "Käyttäjä", content: text });
+      appendMessage("user", "Käyttäjä", "", text);
+
+      // Valitut panelistit
+      const selected = activeParticipants.map(id => participantsConfig[id]).filter(Boolean);
+
+      try {
+        const resp = await fetch("/api/respond", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conversation: conversation,
+            participants: selected,
+            document: currentDocument,
+            auto_update_doc: true
+          })
+        });
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let currentAssistantEl = null;
+        let currentAssistantText = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n\n");
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const event = JSON.parse(line.substring(6));
+
+            if (event.type === "message_start") {
+              currentAssistantText = "";
+              currentAssistantEl = appendMessage("assistant", event.name, event.role, "");
+            } else if (event.type === "token") {
+              currentAssistantText += event.text;
+              if (currentAssistantEl) {
+                currentAssistantEl.querySelector(".message-body").textContent = currentAssistantText;
+              }
+              scrollChatToBottom();
+            } else if (event.type === "message_done") {
+              conversation.push({
+                role: "assistant",
+                name: event.name,
+                content: currentAssistantText
+              });
+            } else if (event.type === "usage") {
+              recordUsage(event.model, event.usage);
+            } else if (event.type === "doc_auto_update_start") {
+              const statusEl = document.getElementById("doc-status");
+              statusEl.textContent = "Päivitetään automaattisesti...";
+              statusEl.className = "doc-status updating";
+            } else if (event.type === "doc_auto_update_done") {
+              currentDocument = event.document;
+              renderMarkdown(currentDocument);
+              const statusEl = document.getElementById("doc-status");
+              statusEl.textContent = "Ajantasainen";
+              statusEl.className = "doc-status";
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Viestin lähetysvirhe:", err);
+      } finally {
+        document.getElementById("send-btn").disabled = false;
+      }
+    }
+
+    function appendMessage(role, name, subtitle, text) {
+      const chat = document.getElementById("chat-messages");
+      const msg = document.createElement("div");
+      msg.className = `message ${role}`;
+      msg.innerHTML = `
+        <div class="message-header">
+          <span class="message-author">${name}</span>
+          <span class="message-model">${subtitle}</span>
+        </div>
+        <div class="message-body">${text}</div>
+      `;
+      chat.appendChild(msg);
+      scrollChatToBottom();
+      return msg;
+    }
+
+    function scrollChatToBottom() {
+      const chat = document.getElementById("chat-messages");
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function renderMarkdown(md) {
+      const contentEl = document.getElementById("doc-content");
+      if (typeof marked !== "undefined") {
+        contentEl.innerHTML = marked.parse(md);
+      } else {
+        contentEl.textContent = md;
+      }
+    }
+
+    function exportMarkdown() {
+      if (!currentDocument) return;
+      navigator.clipboard.writeText(currentDocument);
+      alert("Dokumentti kopioitu leikepöydälle!");
+    }
+
+    async function saveDocument() {
+      if (!currentDocument) return;
+      const filename = prompt("Anna tiedostonimi:", "suunnitelma.md");
+      if (!filename) return;
+
+      try {
+        const res = await fetch("/api/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filename, content: currentDocument })
+        });
+        const data = await res.json();
+        if (data.ok) alert(`Tallennettu polkuun: ${data.path}`);
+      } catch (err) {
+        alert("Tallennus epäonnistui: " + err);
+      }
+    }
+
+    // Käynnistys
+    loadConfig();
+
+    // Enter-lähetys
+    document.getElementById("user-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendPrompt();
+      }
+    });
+  </script>
+</body>
+</html>
