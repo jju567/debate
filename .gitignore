@@ -5,7 +5,4 @@ __pycache__/
 venv/
 documents/
 data/
-scripts/
 *.log
-test_*.py
-inspect_*.py
