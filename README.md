@@ -8,7 +8,7 @@ Kaikki mallit kulkevat yhden **OpenRouter**-avaimen kautta, joten voit sekoittaa
 
 ## Ominaisuudet
 
-- **Työkalujen Suoritus (Tool Calling / Code Execution)**: Agenteilla (kuten Kolli ja Matti) on mahdollisuus suorittaa Python-koodia suoraan palvelimella (`execute_python`) matemaattisten kaavojen, algoritmien tai skriptien validoimiseksi.
+- **Työkalujen Suoritus (Tool Calling & In-Memory REPL)**: Agenteilla (kuten Kolli ja Matti) on kaksi suoritustapaa: nopea muistipohjainen Python REPL (`eval_python_expression`) kevyisiin laskelmiin ja kokeiluihin sekä täysi prosessisuoritus (`execute_python`) laajoille skripteille.
 - **Aiheiden Hallinta & Tallennus (`data/topics/`)**: Keskustelut, dokumenttiluonnokset ja token-tilastot tallentuvat automaattisesti aihekohtaisesti. Voit luoda uusia aiheita, nimetä niitä ja vaihtaa vanhojen aiheiden välillä suoraan käyttöliittymästä.
 - **Täsmäkutsu (@mention)**: Voit kutsua asiantuntijoita suoraan nimellä (esim. `@kolli`, `@matti`, `@aki`), jolloin vain mainitut agentit vastaavat ja turha automaattinen kehä vältetään.
 - **Dynaamiset Agentit & Roolit**: Agenttien roolit, mallit ja järjestelmäkehotteet määritellään tiedostossa [`agents.json`](agents.json). Uusien agenttien lisäys onnistuu suoraan JSONia muokkaamalla.

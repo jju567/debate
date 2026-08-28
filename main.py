@@ -282,6 +282,22 @@ async def respond(req: RespondRequest):
                                     "name": p.name,
                                     "text": f"\n```python\n# Suoritettu koodi:\n{code_to_run}\n```\n**Tuloste:**\n```\n{output_text}\n```\n"
                                 })
+                            elif fn_name == "eval_python_expression":
+                                expr_to_run = args.get("code_or_expr", "")
+                                yield sse({
+                                    "type": "tool_executed",
+                                    "tool": "eval_python_expression",
+                                    "code": expr_to_run
+                                })
+                                res = eval_in_memory(expr_to_run)
+                                output_text = res["output"]
+                                parts.append(f"\n⚡ *[REPL: `{expr_to_run}`]*\n**Tulos:** `{output_text}`\n")
+                                yield sse({
+                                    "type": "token",
+                                    "id": p.id,
+                                    "name": p.name,
+                                    "text": f"\n⚡ *[REPL: `{expr_to_run}`]*\n**Tulos:** `{output_text}`\n"
+                                })
 
                 except LLMError as e:
                     err = f"[Virhe osallistujalta {p.name}: {e}]"
