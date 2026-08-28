@@ -37,8 +37,9 @@ async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api
         "X-Title": "AI Design Studio",
     }
 
+    timeout_config = httpx.Timeout(180.0, connect=30.0, read=180.0, write=30.0)
     async with client.stream(
-        "POST", OPENROUTER_URL, json=payload, headers=headers, timeout=180.0
+        "POST", OPENROUTER_URL, json=payload, headers=headers, timeout=timeout_config
     ) as resp:
         if resp.status_code != 200:
             body = await resp.aread()

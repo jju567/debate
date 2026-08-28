@@ -20,6 +20,9 @@
 - Älä kirjoita liian pitkiä selityksiä - README pysyy tiiviinä ja luettavana. Käytä bullet-listoja, koodiesimerkkejä ja taulukoita tarvittaessa.
 - **Poikkeus**: Pienet refaktoroinnit, bugikorjaukset tai testien lisäykset (jotka eivät muuta julkista käyttäytymistä) **eivät** vaadi README-päivitystä.
 
+## Virheiden Seuranta & Lokitarkistus
+- **AINA** tarkistetaan taustatehtävien tai suoritusten viimeisimmät lokiviestit mahdollisten fataalien virheiden (Fatal Error, Traceback, Exception, 4xx/5xx API-virheet) varalta ja **ilmoitetaan niistä välittömästi käyttäjälle**, jos sellaisia ilmenee.
+
 ## Git Commit -Viestit (Automaattinen Ehdotus Skillin Mukaisesti)
 - **AINA** kun agentti saa valmiiksi uuden ominaisuuden (feature), bugin korjauksen (fix) tai refaktoroinnin, agentti käyttää [`git-commit-craftsman`](skills/git-commit-craftsman/SKILL.md) -skilliä ja **tarjoaa vastauksen lopussa valmiin tiiviin Git-commit-viestin (max 3 riviä)** muodossa:
   ```text

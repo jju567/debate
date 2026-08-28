@@ -121,7 +121,19 @@ def sse(obj: dict) -> str:
     return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
 
 
-from tools import TOOLS, run_python_code, eval_in_memory
+from tools import (
+    TOOLS,
+    run_python_code,
+    eval_in_memory,
+    search_web,
+    fetch_webpage_content,
+    read_local_file_content,
+    list_local_directory_contents
+)
+from library import read_library_document, list_library_documents
+from storage_routes import router as storage_router
+
+app.include_router(storage_router)
 
 # ---------- Päätepisteet ----------
 
@@ -174,22 +186,29 @@ async def respond(req: RespondRequest):
     mentioned_ids = []
     for pid, p in participants_dict.items():
         name_lower = p["name"].lower()
-        if f"@{pid}" in last_user_msg or f"@{name_lower}" in last_user_msg or last_user_msg.startswith(f"{name_lower},") or last_user_msg.startswith(f"{name_lower}:"):
+        # Etsitään @nimi, @id tai lauseen aloitus "Nimi, ..."
+        pattern = rf"(?:@|^|\b)({re.escape(pid)}|{re.escape(name_lower)})(?:[:,\s]|$)"
+        if f"@{pid}" in last_user_msg or f"@{name_lower}" in last_user_msg:
             mentioned_ids.append(pid)
+        elif re.search(pattern, last_user_msg) and (last_user_msg.startswith(name_lower) or f" {name_lower}" in last_user_msg):
+            # Varmistetaan ettei tavallinen sana vahingossa liipaise jos ei @-etuliitettä
+            if f"@{pid}" in last_user_msg or f"@{name_lower}" in last_user_msg or last_user_msg.startswith(f"{name_lower},") or last_user_msg.startswith(f"{name_lower}:"):
+                mentioned_ids.append(pid)
 
     # Määritetään vastaajat: jos käyttäjä kutsui suoraan tiettyä agenttia/agentteja, vastataan vain heille!
     selected_participants: list[Participant] = []
     if mentioned_ids:
         for pid in mentioned_ids:
-            p = participants_dict[pid]
-            selected_participants.append(Participant(
-                id=p["id"],
-                name=p["name"],
-                role=p["role"],
-                model=p["model"],
-                system_prompt=p.get("system_prompt")
-            ))
-    elif req.participants:
+            if pid in participants_dict:
+                p = participants_dict[pid]
+                selected_participants.append(Participant(
+                    id=p["id"],
+                    name=p["name"],
+                    role=p["role"],
+                    model=p["model"],
+                    system_prompt=p.get("system_prompt")
+                ))
+    elif req.participants and len(req.participants) > 0:
         selected_participants = req.participants
     else:
         for pid in cfg["default_active"]:
@@ -202,6 +221,17 @@ async def respond(req: RespondRequest):
                     model=p["model"],
                     system_prompt=p.get("system_prompt")
                 ))
+
+    # Varmistus: jos lista on silti tyhjä, otetaan vähintään seppo
+    if not selected_participants and participants_dict:
+        first_p = list(participants_dict.values())[0]
+        selected_participants.append(Participant(
+            id=first_p["id"],
+            name=first_p["name"],
+            role=first_p["role"],
+            model=first_p["model"],
+            system_prompt=first_p.get("system_prompt")
+        ))
 
     editor_model = req.editor_model or cfg["editor_model"]
     window_size = req.max_history or cfg["max_history_messages"]
@@ -254,9 +284,9 @@ async def respond(req: RespondRequest):
                                 "usage": event["usage"]
                             })
 
-                    # Jos malli kutsui työkalua (esim. suoritti Python-koodia)
+                    # 1. Jos malli käytti OpenAI tool_calls -mekanismia:
                     if tool_calls_accumulator:
-                        yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n\n⚡ *[Suoritetaan Python-koodia...]*\n"})
+                        yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n\n⚡ *[Suoritetaan työkalua...]*\n"})
                         for tc in tool_calls_accumulator:
                             fn = tc.get("function", {})
                             fn_name = fn.get("name")
@@ -268,36 +298,72 @@ async def respond(req: RespondRequest):
 
                             if fn_name == "execute_python":
                                 code_to_run = args.get("code", "")
-                                yield sse({
-                                    "type": "tool_executed",
-                                    "tool": "execute_python",
-                                    "code": code_to_run
-                                })
                                 res = run_python_code(code_to_run)
-                                output_text = res["output"]
-                                parts.append(f"\n```python\n# Suoritettu koodi:\n{code_to_run}\n```\n**Tuloste:**\n```\n{output_text}\n```\n")
-                                yield sse({
-                                    "type": "token",
-                                    "id": p.id,
-                                    "name": p.name,
-                                    "text": f"\n```python\n# Suoritettu koodi:\n{code_to_run}\n```\n**Tuloste:**\n```\n{output_text}\n```\n"
-                                })
+                                out_msg = f"\n```python\n# Suoritettu koodi:\n{code_to_run}\n```\n**⚡ Tuloste:**\n```\n{res['output']}\n```\n"
+                                parts.append(out_msg)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
                             elif fn_name == "eval_python_expression":
                                 expr_to_run = args.get("code_or_expr", "")
-                                yield sse({
-                                    "type": "tool_executed",
-                                    "tool": "eval_python_expression",
-                                    "code": expr_to_run
-                                })
                                 res = eval_in_memory(expr_to_run)
-                                output_text = res["output"]
-                                parts.append(f"\n⚡ *[REPL: `{expr_to_run}`]*\n**Tulos:** `{output_text}`\n")
-                                yield sse({
-                                    "type": "token",
-                                    "id": p.id,
-                                    "name": p.name,
-                                    "text": f"\n⚡ *[REPL: `{expr_to_run}`]*\n**Tulos:** `{output_text}`\n"
-                                })
+                                out_msg = f"\n⚡ *[REPL: `{expr_to_run}`]*\n**Tulos:** `{res['output']}`\n"
+                                parts.append(out_msg)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
+                            elif fn_name == "web_search":
+                                query = args.get("query", "")
+                                res = search_web(query)
+                                out_msg = f"\n🌐 *[Verkkohaku: \"{query}\"]*\n**Tulokset:**\n{res['output']}\n"
+                                parts.append(out_msg)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
+                            elif fn_name == "fetch_webpage":
+                                url_to_fetch = args.get("url", "")
+                                res = fetch_webpage_content(url_to_fetch)
+                                out_msg = f"\n📄 *[Haettu sivu: {url_to_fetch}]*\n**Sisältö:**\n{res['output'][:500]}...\n"
+                                parts.append(out_msg)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
+                            elif fn_name == "read_library_doc":
+                                doc_id = args.get("doc_id", "")
+                                res = read_library_document(doc_id)
+                                output_text = res["content"] if res.get("success") else res.get("error", "Virhe")
+                                out_msg = f"\n📚 *[Luettu viitedokumentti: {doc_id}]*\n```\n{output_text[:600]}...\n```\n"
+                                parts.append(out_msg)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
+                            elif fn_name == "list_library_docs":
+                                docs = list_library_documents()
+                                docs_summary = "\n".join([f"- {d['filename']} ({d['char_count']} merkkiä): {d['summary']}" for d in docs]) or "(kirjasto on tyhjä)"
+                                out_msg = f"\n📚 *[Kirjaston dokumentit:]*\n{docs_summary}\n"
+                                parts.append(out_msg)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
+                            elif fn_name == "read_local_file":
+                                path_val = args.get("path", "")
+                                res = read_local_file_content(path_val)
+                                out_msg = f"\n📂 *[Luettu paikallinen tiedosto: `{path_val}`]*\n```\n{res['output'][:600]}...\n```\n"
+                                parts.append(out_msg)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
+                            elif fn_name == "list_local_directory":
+                                dir_path = args.get("path", "")
+                                res = list_local_directory_contents(dir_path)
+                                out_msg = f"\n📁 *[Kansion sisältö: `{dir_path}`]*\n```\n{res['output']}\n```\n"
+                                parts.append(out_msg)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
+
+                    # 2. Automaattinen suoritus (Koodilohkojen tunnistus):
+                    # Jos malli kirjoitti koodilohkon (```python ... ```) suoraan tekstinä,
+                    # suoritetaan koodi automaattisesti taustalla ja näytetään tuloste ilman keinotekoisia pituusrajoituksia!
+                    full_text_so_far = "".join(parts)
+                    code_blocks = re.findall(r"```python\s*(.*?)\s*```", full_text_so_far, re.DOTALL)
+                    if code_blocks and not tool_calls_accumulator:
+                        last_code = code_blocks[-1].strip()
+                        # Suoritetaan mikä tahansa Python-koodilohko (luokat, funktiot, skriptit jne.)
+                        if len(last_code) > 0 and len(last_code) < 50000:
+                            res = run_python_code(last_code, timeout_sec=30)
+                            if res["output"] and res["output"] != "(ei tulostetta)":
+                                exec_banner = f"\n\n⚡ **Koodin ajotulos (Automaattinen suoritus):**\n```\n{res['output']}\n```\n"
+                                parts.append(exec_banner)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": exec_banner})
+                            elif res.get("stderr"):
+                                exec_banner = f"\n\n⚠️ **Koodin suoritusvirhe:**\n```\n{res['stderr']}\n```\n"
+                                parts.append(exec_banner)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": exec_banner})
 
                 except LLMError as e:
                     err = f"[Virhe osallistujalta {p.name}: {e}]"
@@ -400,74 +466,8 @@ async def document(req: DocumentRequest):
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
-# ---------- Aiheiden (Topics) hallinta ----------
-
-def get_topics_dir() -> Path:
-    topics_dir = DATA_DIR / "topics"
-    topics_dir.mkdir(parents=True, exist_ok=True)
-    return topics_dir
-
-
-@app.get("/api/topics")
-async def list_topics():
-    """Listaa kaikki tallennetut aiheet ja niiden metatiedot."""
-    td = get_topics_dir()
-    topics = []
-    for p in td.glob("*.json"):
-        try:
-            with open(p, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                topics.append({
-                    "id": data.get("id", p.stem),
-                    "title": data.get("title", p.stem),
-                    "summary": data.get("summary", ""),
-                    "updated_at": data.get("updated_at", ""),
-                    "msg_count": len(data.get("conversation", [])),
-                })
-        except Exception:
-            continue
-    # Järjestetään uusimmat ensin
-    topics.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
-    return {"topics": topics}
-
-
-@app.get("/api/topics/{topic_id}")
-async def get_topic(topic_id: str):
-    """Hae tietyn aiheen koko tila (keskustelu, dokumentti, tilastot)."""
-    safe_id = re.sub(r"[^A-Za-z0-9_.\- ]", "_", topic_id).strip()
-    path = get_topics_dir() / f"{safe_id}.json"
-    if not path.exists():
-        return {"error": "Aihetta ei löydy"}
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-@app.post("/api/topics/save")
-async def save_topic(req: TopicSaveRequest):
-    """Tallenna aihe ja sen tiivistetty tila data/topics -kansioon."""
-    td = get_topics_dir()
-    safe_id = re.sub(r"[^A-Za-z0-9_.\- ]", "_", req.id).strip() or "aihe_1"
-    path = td / f"{safe_id}.json"
-    
-    # Luodaan lyhyt tiivistelmä jos ei annettu
-    summary = req.summary
-    if not summary and req.conversation:
-        last_msgs = [m.content for m in req.conversation if m.role == "user"]
-        summary = (last_msgs[-1][:120] + "...") if last_msgs else req.title
-
-    import datetime
-    topic_data = {
-        "id": safe_id,
-        "title": req.title.strip() or safe_id,
-        "summary": summary,
-        "conversation": [m.dict() for m in req.conversation],
-        "document": req.document,
-        "stats": req.stats,
-        "updated_at": datetime.datetime.now().isoformat(),
-    }
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(topic_data, f, ensure_ascii=False, indent=2)
-    return {"ok": True, "topic": topic_data}
+# Liitetään dokumenttikirjasto ja aiheiden hallintareitit (storage_routes.py)
+app.include_router(storage_router)
 
 
 @app.post("/api/save")

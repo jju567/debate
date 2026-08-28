@@ -422,6 +422,7 @@
       </select>
       <button class="btn-sm" style="padding: 3px 8px; font-size: 0.75rem;" onclick="createNewTopic()" title="Luo uusi suunnitteluaihe">+ Uusi</button>
       <button class="btn-sm" style="padding: 3px 8px; font-size: 0.75rem;" onclick="renameCurrentTopic()" title="Nimeä aihe uudelleen">✏️</button>
+      <button class="btn-sm" style="padding: 3px 8px; font-size: 0.75rem; background: #1e1b4b; border-color: #6366f1; color: #a5b4fc;" onclick="openLibraryModal()" title="Dokumenttikirjasto / Viitteet">📚 Kirjasto</button>
     </div>
 
     <!-- Osallistujien valinta -->
@@ -442,11 +443,60 @@
     </div>
   </header>
 
+  <!-- Globaali Etenemispalkki & Tila (Progress Bar) -->
+  <div id="progress-container" style="display: none; width: 100%; height: 4px; background: #1e293b; position: relative; overflow: hidden;">
+    <div id="progress-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, #38bdf8, #818cf8, #34d399); animation: progress-anim 1.5s infinite linear; transform-origin: 0% 50%;"></div>
+  </div>
+  <div id="agent-thinking-banner" style="display: none; padding: 4px 16px; background: #1e1b4b; border-bottom: 1px solid #4338ca; font-size: 0.75rem; color: #a5b4fc; align-items: center; gap: 8px;">
+    <span class="pulse-dot" style="width: 8px; height: 8px; background: #818cf8; border-radius: 50%; display: inline-block;"></span>
+    <span id="agent-thinking-text">Agentti vastaa...</span>
+  </div>
+
+  <style>
+    @keyframes progress-anim {
+      0% { transform: translateX(-100%) scaleX(0.2); }
+      50% { transform: translateX(0%) scaleX(0.7); }
+      100% { transform: translateX(100%) scaleX(0.2); }
+    }
+  </style>
+
+  <!-- Dokumenttikirjasto Modali -->
+  <div id="library-modal" style="display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: #111827; border: 1px solid var(--border-color); border-radius: 12px; width: 600px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+      <div style="padding: 16px 20px; background: #1e293b; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 8px;">📚 Dokumenttikirjasto (Viitteet)</h3>
+        <button class="btn-sm" onclick="closeLibraryModal()">✕ Sulje</button>
+      </div>
+      <div style="padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 16px;">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;">
+          Lataa tiedostoja (.txt, .md, .json, .py jne.) agenttien taustaviitteeksi. Tiedostot eivät paisuta keskusteluhistoriaa jatkuvasti, vaan agentit lukevat niitä tarpeen mukaan.
+        </p>
+        
+        <!-- Upload dropzone -->
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <input type="file" id="library-file-input" style="display: none;" onchange="handleFileUpload(event)">
+          <button class="btn" style="font-size: 0.85rem; padding: 6px 14px;" onclick="document.getElementById('library-file-input').click()">+ Lataa tiedosto 📁</button>
+          <span id="upload-status" style="font-size: 0.8rem; color: #34d399;"></span>
+        </div>
+
+        <div style="border-top: 1px solid var(--border-color); padding-top: 12px;">
+          <div style="font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: #94a3b8;">Saatavilla olevat viitedokumentit:</div>
+          <div id="library-doc-list" style="display: flex; flex-direction: column; gap: 8px;">
+            <em>Ladataan kirjastoa...</em>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="workspace">
     <!-- Chat Paneeli -->
     <div class="chat-container">
       <div class="chat-header" style="padding: 10px 16px; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">💬 KESKUSTELU</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">💬 KESKUSTELU</span>
+          <button id="resume-scroll-btn" class="btn-sm" style="display: none; font-size: 0.72rem; padding: 2px 8px; background: rgba(56, 189, 248, 0.15); border-color: #38bdf8; color: #38bdf8;" onclick="resumeAutoScroll()">⬇️ Vieritä alas</button>
+        </div>
         <button class="btn-sm" style="font-size: 0.75rem; padding: 4px 8px;" onclick="clearHistory()">Tyhjennä 🗑️</button>
       </div>
       <div class="chat-messages" id="chat-messages">
@@ -613,8 +663,9 @@
       const text = input.value.trim();
       if (!text) return;
 
-      input.value = "";
-      document.getElementById("send-btn").disabled = true;
+      const sendBtn = document.getElementById("send-btn");
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Vastataan... ⏳";
 
       // Lisää käyttäjän viesti
       conversation.push({ role: "user", name: userProfile.name, content: text });
@@ -624,13 +675,24 @@
       // Valitut panelistit
       const selected = activeParticipants.map(id => participantsConfig[id]).filter(Boolean);
 
+      const progressContainer = document.getElementById("progress-container");
+      const thinkingBanner = document.getElementById("agent-thinking-banner");
+      const thinkingText = document.getElementById("agent-thinking-text");
+
+      if (progressContainer) progressContainer.style.display = "block";
+      if (thinkingBanner) {
+        thinkingBanner.style.display = "flex";
+        thinkingText.textContent = "Odotetaan vastausta malleilta...";
+      }
+
       try {
         const resp = await fetch("/api/respond", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            topic_id: currentTopicId,
             conversation: conversation,
-            participants: selected,
+            participants: selected.length > 0 ? selected : null,
             document: currentDocument,
             auto_update_doc: true
           })
@@ -668,9 +730,12 @@
               if (event.type === "message_start") {
                 currentAssistantText = "";
                 currentAssistantEl = appendMessage("assistant", event.name, event.role, "");
+                if (thinkingText) thinkingText.textContent = `${event.name} (${event.role}) vastaa...`;
               } else if (event.type === "token") {
                 currentAssistantText += event.text;
                 updateStreamingMessage(currentAssistantEl, currentAssistantText);
+              } else if (event.type === "tool_executed") {
+                if (thinkingText) thinkingText.textContent = `⚡ Suoritetaan työkalua: ${event.tool}...`;
               } else if (event.type === "error") {
                 console.error("Virhe palvelimelta:", event.text);
                 appendMessage("assistant", event.name || "Virhe", "Järjestelmävirhe", `⚠️ ${event.text}`);
@@ -691,6 +756,7 @@
                 const statusEl = document.getElementById("doc-status");
                 statusEl.textContent = "Päivitetään automaattisesti...";
                 statusEl.className = "doc-status updating";
+                if (thinkingText) thinkingText.textContent = "Editori kokoaa ja päivittää suunnitteludokumenttia...";
               } else if (event.type === "doc_auto_update_done") {
                 if (event.document && event.document.trim()) {
                   currentDocument = event.document;
@@ -706,8 +772,14 @@
         }
       } catch (err) {
         console.error("Viestin lähetysvirhe:", err);
+        appendMessage("assistant", "Virhe", "Yhteysvirhe", `⚠️ Viestin lähetys epäonnistui: ${err}`);
       } finally {
-        document.getElementById("send-btn").disabled = false;
+        const sendBtn = document.getElementById("send-btn");
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Lähetä 🚀";
+        input.value = "";
+        if (progressContainer) progressContainer.style.display = "none";
+        if (thinkingBanner) thinkingBanner.style.display = "none";
       }
     }
 
@@ -745,14 +817,40 @@
       scrollChatToBottom();
     }
 
-    function scrollChatToBottom() {
+    let userScrolledUp = false;
+
+    // Kuunnellaan käyttäjän omaa vieritystä
+    function initScrollListener() {
+      const chat = document.getElementById("chat-messages");
+      if (!chat) return;
+      
+      chat.addEventListener("scroll", () => {
+        // Jos käyttäjä on vierittänyt yli 60px ylöspäin pohjalta, asetetaan autoscroll pauselle
+        const distanceFromBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
+        if (distanceFromBottom > 60) {
+          userScrolledUp = true;
+          const resumeBtn = document.getElementById("resume-scroll-btn");
+          if (resumeBtn) resumeBtn.style.display = "inline-block";
+        } else {
+          userScrolledUp = false;
+          const resumeBtn = document.getElementById("resume-scroll-btn");
+          if (resumeBtn) resumeBtn.style.display = "none";
+        }
+      });
+    }
+
+    function resumeAutoScroll() {
+      userScrolledUp = false;
+      const resumeBtn = document.getElementById("resume-scroll-btn");
+      if (resumeBtn) resumeBtn.style.display = "none";
+      scrollChatToBottom(true);
+    }
+
+    function scrollChatToBottom(force = false) {
+      if (userScrolledUp && !force) return; // Älä vieritä jos käyttäjä lukee ylempää!
       const chat = document.getElementById("chat-messages");
       if (!chat) return;
       chat.scrollTop = chat.scrollHeight;
-      const lastChild = chat.lastElementChild;
-      if (lastChild) {
-        lastChild.scrollIntoView({ behavior: "smooth", block: "end" });
-      }
     }
 
     function renderMarkdown(md) {
@@ -1026,11 +1124,106 @@
       saveState();
     }
 
+    // Dokumenttikirjasto (Library) toiminnot
+    async function openLibraryModal() {
+      document.getElementById("library-modal").style.display = "flex";
+      await refreshLibraryDocList();
+    }
+
+    function closeLibraryModal() {
+      document.getElementById("library-modal").style.display = "none";
+    }
+
+    async function refreshLibraryDocList() {
+      const listEl = document.getElementById("library-doc-list");
+      try {
+        const res = await fetch("/api/library");
+        const data = await res.json();
+        const docs = data.documents || [];
+        if (docs.length === 0) {
+          listEl.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-muted);">Kirjastossa ei ole vielä tiedostoja. Lataa ensimmäinen yllä olevasta napista!</div>';
+          return;
+        }
+        listEl.innerHTML = "";
+        for (const d of docs) {
+          const item = document.createElement("div");
+          item.style.background = "#1e293b";
+          item.style.border = "1px solid var(--border-color)";
+          item.style.borderRadius = "8px";
+          item.style.padding = "10px 14px";
+          item.style.display = "flex";
+          item.style.justifyContent = "space-between";
+          item.style.alignItems = "center";
+          item.innerHTML = `
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 600; color: #38bdf8;">📄 ${d.filename} <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: normal;">(${d.char_count} merkkiä)</span></div>
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">${d.summary}</div>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn-sm" style="font-size: 0.72rem; padding: 2px 6px;" onclick="insertDocReference('${d.filename}')" title="Lisää viite chattiin">Viittaa 💬</button>
+              <button class="btn-sm" style="font-size: 0.72rem; padding: 2px 6px; background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #fca5a5;" onclick="deleteLibraryDoc('${d.id}')" title="Poista">🗑️</button>
+            </div>
+          `;
+          listEl.appendChild(item);
+        }
+      } catch (e) {
+        listEl.innerHTML = `<div style="color: #ef4444; font-size: 0.8rem;">Virhe kirjaston latauksessa: ${e}</div>`;
+      }
+    }
+
+    async function handleFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const statusEl = document.getElementById("upload-status");
+      statusEl.textContent = `Ladataan ${file.name}...`;
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const content = event.target.result;
+        try {
+          const res = await fetch("/api/library/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ filename: file.name, content: content })
+          });
+          const data = await res.json();
+          if (data.ok) {
+            statusEl.textContent = `✅ ${file.name} ladattu!`;
+            setTimeout(() => { statusEl.textContent = ""; }, 3000);
+            await refreshLibraryDocList();
+          }
+        } catch (err) {
+          statusEl.textContent = `❌ Virhe: ${err}`;
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = "";
+    }
+
+    async function deleteLibraryDoc(docId) {
+      if (!confirm(`Haluatko varmasti poistaa tiedoston "${docId}"?`)) return;
+      try {
+        await fetch(`/api/library/${docId}`, { method: "DELETE" });
+        await refreshLibraryDocList();
+      } catch (err) {
+        alert("Poisto epäonnistui: " + err);
+      }
+    }
+
+    function insertDocReference(filename) {
+      const input = document.getElementById("user-input");
+      input.value = `Lue ja huomioi viitedokumentti '${filename}': ` + input.value;
+      closeLibraryModal();
+      input.focus();
+    }
+
     // Käynnistys
     loadConfig().then(async () => {
       restoreState();
       renderPanelistChips();
       await loadTopics();
+      initScrollListener();
     });
 
     // Enter-lähetys
