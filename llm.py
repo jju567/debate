@@ -5,10 +5,12 @@ usealla mallilla on sama muoto. Streamaus tulee SSE-muodossa (rivit "data: {...}
 """
 
 import json
-
+import logging
 import httpx
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+logger = logging.getLogger("debate.llm")
+logger.setLevel(logging.INFO)
 
 
 class LLMError(Exception):
@@ -18,6 +20,7 @@ class LLMError(Exception):
 async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api_key: str, tools: list | None = None):
     """Async-generaattori, joka tuottaa tekstipaloja ja työkalukutsuja yhdeltä mallilta.
 
+    Kokoaa streamaavat tool_calls-deltalohkot oikein indeksin mukaan.
     Heittää LLMError-poikkeuksen jos kutsu epäonnistuu.
     """
     payload = {
@@ -43,7 +46,12 @@ async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api
     ) as resp:
         if resp.status_code != 200:
             body = await resp.aread()
-            raise LLMError(f"HTTP {resp.status_code}: {body.decode(errors='replace')[:400]}")
+            err_text = body.decode(errors="replace")[:500]
+            logger.error(f"OpenRouter HTTP {resp.status_code}: {err_text}")
+            raise LLMError(f"HTTP {resp.status_code}: {err_text}")
+
+        # Pidetään kirjaa streamaavista tool_calls -paloista per index
+        accumulated_tools: dict[int, dict] = {}
 
         async for line in resp.aiter_lines():
             if not line or not line.startswith("data:"):
@@ -69,9 +77,40 @@ async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api
             if chunk:
                 yield {"type": "text", "text": chunk}
 
-            # Handle tool calls
+            # Handle streaming tool calls deltas
             tool_calls = delta.get("tool_calls")
             if tool_calls:
-                yield {"type": "tool_calls", "tool_calls": tool_calls}
+                for tc in tool_calls:
+                    idx = tc.get("index", 0)
+                    if idx not in accumulated_tools:
+                        accumulated_tools[idx] = {
+                            "id": tc.get("id", f"call_{idx}"),
+                            "type": "function",
+                            "function": {
+                                "name": tc.get("function", {}).get("name", "") or "",
+                                "arguments": ""
+                            }
+                        }
+                    else:
+                        if tc.get("id"):
+                            accumulated_tools[idx]["id"] = tc["id"]
+                    
+                    fn_chunk = tc.get("function", {})
+                    fn_name_chunk = fn_chunk.get("name")
+                    if fn_name_chunk:
+                        # Jos nimeä ei vielä asetettu tai kyseessä on uusi pala
+                        if not accumulated_tools[idx]["function"]["name"]:
+                            accumulated_tools[idx]["function"]["name"] = fn_name_chunk
+                        elif accumulated_tools[idx]["function"]["name"] != fn_name_chunk:
+                            # Vain jos uusi pala jatkaa nimeä
+                            if not fn_name_chunk.startswith(accumulated_tools[idx]["function"]["name"]):
+                                accumulated_tools[idx]["function"]["name"] += fn_name_chunk
+                    
+                    if fn_chunk.get("arguments"):
+                        accumulated_tools[idx]["function"]["arguments"] += fn_chunk["arguments"]
 
-
+        # Kun stream on päättynyt, lähetetään kootut eheät työkalukutsut
+        if accumulated_tools:
+            complete_tool_calls = [accumulated_tools[i] for i in sorted(accumulated_tools.keys())]
+            logger.info(f"Koottu {len(complete_tool_calls)} työkalukutsua: {complete_tool_calls}")
+            yield {"type": "tool_calls_complete", "tool_calls": complete_tool_calls}

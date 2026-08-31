@@ -590,6 +590,7 @@
         const chip = document.createElement("div");
         chip.className = `panelist-chip ${activeParticipants.includes(id) ? "active" : ""}`;
         chip.innerHTML = `<span>${p.name}</span><span class="role-tag">${p.role.split(" ")[0]}</span>`;
+        chip.title = `${p.name} (${p.role})\nMalli: ${p.model || 'oletus'}\nKlikkaa ottaaksesi mukaan tai pois paneelista`;
         chip.onclick = () => toggleParticipant(id, chip);
         container.appendChild(chip);
       }
@@ -604,7 +605,7 @@
           btn.style.fontSize = "0.72rem";
           btn.style.padding = "2px 8px";
           btn.textContent = `@${p.name}`;
-          btn.title = `Kutsu vain asiantuntijaa ${p.name}`;
+          btn.title = `Kutsu vain asiantuntijaa ${p.name} (Malli: ${p.model || 'oletus'})`;
           btn.onclick = () => insertMention(`@${p.name} `);
           mentionBar.appendChild(btn);
         }
@@ -666,6 +667,7 @@
       const sendBtn = document.getElementById("send-btn");
       sendBtn.disabled = true;
       sendBtn.textContent = "Vastataan... ⏳";
+      input.value = ""; // Tyhjennetään syöttökenttä välittömästi lähetyksen alussa
 
       // Lisää käyttäjän viesti
       conversation.push({ role: "user", name: userProfile.name, content: text });
@@ -729,8 +731,8 @@
 
               if (event.type === "message_start") {
                 currentAssistantText = "";
-                currentAssistantEl = appendMessage("assistant", event.name, event.role, "");
-                if (thinkingText) thinkingText.textContent = `${event.name} (${event.role}) vastaa...`;
+                currentAssistantEl = appendMessage("assistant", event.name, event.role, "", event.model);
+                if (thinkingText) thinkingText.textContent = `${event.name} (${event.role}) vastaa... [${event.model || ''}]`;
               } else if (event.type === "token") {
                 currentAssistantText += event.text;
                 updateStreamingMessage(currentAssistantEl, currentAssistantText);
@@ -783,7 +785,7 @@
       }
     }
 
-    function appendMessage(role, name, subtitle, text) {
+    function appendMessage(role, name, subtitle, text, modelName = "") {
       const chat = document.getElementById("chat-messages");
       const msg = document.createElement("div");
       msg.className = `message ${role}`;
@@ -793,10 +795,12 @@
         renderedContent = marked.parse(text);
       }
 
+      const modelTooltip = modelName ? `Malli: ${modelName}` : subtitle;
+
       msg.innerHTML = `
         <div class="message-header">
-          <span class="message-author">${name}</span>
-          <span class="message-model">${subtitle}</span>
+          <span class="message-author" title="${modelTooltip}">${name}</span>
+          <span class="message-model" title="${modelTooltip}">${subtitle}</span>
         </div>
         <div class="message-body ${text ? 'rendered-md' : ''}">${renderedContent}</div>
       `;
@@ -963,7 +967,9 @@
           } else {
             for (const m of conversation) {
               const subtitle = m.role === "user" ? (userProfile.role || "") : "";
-              appendMessage(m.role, m.name, subtitle, m.content);
+              const pConfig = Object.values(participantsConfig).find(p => p.name.toLowerCase() === (m.name || '').toLowerCase());
+              const mModel = m.model || (pConfig ? pConfig.model : "");
+              appendMessage(m.role, m.name, subtitle, m.content, mModel);
             }
           }
 
@@ -1070,7 +1076,9 @@
             chat.innerHTML = "";
             for (const m of conversation) {
               const subtitle = m.role === "user" ? (userProfile.role || "") : "";
-              appendMessage(m.role, m.name, subtitle, m.content);
+              const pConfig = Object.values(participantsConfig).find(p => p.name.toLowerCase() === (m.name || '').toLowerCase());
+              const mModel = m.model || (pConfig ? pConfig.model : "");
+              appendMessage(m.role, m.name, subtitle, m.content, mModel);
             }
           }
         }

@@ -288,7 +288,7 @@ def eval_in_memory(code_or_expr: str) -> dict:
     
     try:
         with contextlib.redirect_stdout(stdout_capture), contextlib.redirect_stderr(stdout_capture):
-            # Kokeillaan ensin suoraa evaluointia (lauseke)
+            # Kokeillaan ensin eval (yksittäinen lauseke)
             try:
                 compiled = compile(code_or_expr, "<repl>", "eval")
                 result_val = eval(compiled, _REPL_GLOBALS)
@@ -301,8 +301,8 @@ def eval_in_memory(code_or_expr: str) -> dict:
                     "stderr": "",
                     "output": output
                 }
-            except SyntaxError:
-                # Jos kyseessä on monirivinen koodi (exec)
+            except (SyntaxError, TypeError):
+                # Monirivinen tai lauseita sisältävä koodi (exec)
                 compiled = compile(code_or_expr, "<repl>", "exec")
                 exec(compiled, _REPL_GLOBALS)
                 captured = stdout_capture.getvalue().strip()

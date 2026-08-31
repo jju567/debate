@@ -23,16 +23,8 @@ from pydantic import BaseModel
 
 from config import load_agents_config, DEFAULT_EDITOR_MODEL, MAX_HISTORY_MESSAGES
 from llm import stream_chat, LLMError
-from tools import (
-    TOOLS,
-    run_python_code,
-    eval_in_memory,
-    search_web,
-    fetch_webpage_content,
-    read_local_file_content,
-    list_local_directory_contents,
-)
-from library import read_library_document, list_library_documents
+from tools import TOOLS, run_python_code
+from tool_executor import execute_tool_call
 from storage_routes import router as storage_router
 
 load_dotenv()
@@ -264,95 +256,73 @@ async def respond(req: RespondRequest):
                 messages += conversation_for_model(working, p.id, req.document, window_size=window_size)
                 
                 parts: list[str] = []
-                tool_calls_accumulator = []
                 try:
                     # Mallille annetaan työkalut (esim. execute_python)
-                    async for event in stream_chat(client, p.model, messages, api_key, tools=TOOLS):
-                        if event["type"] == "text":
-                            chunk = event["text"]
-                            parts.append(chunk)
-                            yield sse({"type": "token", "id": p.id, "name": p.name, "text": chunk})
-                        elif event["type"] == "tool_calls":
-                            tool_calls_accumulator.extend(event["tool_calls"])
-                        elif event["type"] == "usage":
-                            yield sse({
-                                "type": "usage",
-                                "id": p.id,
-                                "name": p.name,
-                                "model": p.model,
-                                "usage": event["usage"]
-                            })
+                    current_model_messages = list(messages)
+                    
+                    # Agent Tool Loop (max 2 kierrosta: 1. suoritus, 2. kommentointi)
+                    for loop_step in range(2):
+                        tool_calls_complete = []
+                        async for event in stream_chat(client, p.model, current_model_messages, api_key, tools=TOOLS if loop_step == 0 else None):
+                            if event["type"] == "text":
+                                chunk = event["text"]
+                                parts.append(chunk)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": chunk})
+                            elif event["type"] == "tool_calls_complete":
+                                tool_calls_complete = event["tool_calls"]
+                            elif event["type"] == "usage":
+                                yield sse({
+                                    "type": "usage",
+                                    "id": p.id,
+                                    "name": p.name,
+                                    "model": p.model,
+                                    "usage": event["usage"]
+                                })
 
-                    # 1. Jos malli käytti OpenAI tool_calls -mekanismia:
-                    if tool_calls_accumulator:
+                        if not tool_calls_complete:
+                            # Ei työkalukutsuja tai kommentointikierros valmis
+                            break
+
+                        # Malli pyysi työkalukutsuja: suoritetaan ja valmistellaan re-prompt
                         yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n\n⚡ *[Suoritetaan työkalua...]*\n"})
-                        for tc in tool_calls_accumulator:
+                        
+                        assistant_msg_content = "".join(parts)
+                        current_model_messages.append({
+                            "role": "assistant",
+                            "content": assistant_msg_content or None,
+                            "tool_calls": tool_calls_complete
+                        })
+
+                        for tc in tool_calls_complete:
+                            call_id = tc.get("id", "call_1")
                             fn = tc.get("function", {})
-                            fn_name = fn.get("name")
+                            fn_name = fn.get("name", "")
                             args_str = fn.get("arguments", "{}")
                             try:
                                 args = json.loads(args_str) if isinstance(args_str, str) else args_str
                             except Exception:
                                 args = {}
 
-                            if fn_name == "execute_python":
-                                code_to_run = args.get("code", "")
-                                res = run_python_code(code_to_run)
-                                out_msg = f"\n```python\n# Suoritettu koodi:\n{code_to_run}\n```\n**⚡ Tuloste:**\n```\n{res['output']}\n```\n"
-                                parts.append(out_msg)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
-                            elif fn_name == "eval_python_expression":
-                                expr_to_run = args.get("code_or_expr", "")
-                                res = eval_in_memory(expr_to_run)
-                                out_msg = f"\n⚡ *[REPL: `{expr_to_run}`]*\n**Tulos:** `{res['output']}`\n"
-                                parts.append(out_msg)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
-                            elif fn_name == "web_search":
-                                query = args.get("query", "")
-                                res = search_web(query)
-                                out_msg = f"\n🌐 *[Verkkohaku: \"{query}\"]*\n**Tulokset:**\n{res['output']}\n"
-                                parts.append(out_msg)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
-                            elif fn_name == "fetch_webpage":
-                                url_to_fetch = args.get("url", "")
-                                res = fetch_webpage_content(url_to_fetch)
-                                out_msg = f"\n📄 *[Haettu sivu: {url_to_fetch}]*\n**Sisältö:**\n{res['output'][:500]}...\n"
-                                parts.append(out_msg)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
-                            elif fn_name == "read_library_doc":
-                                doc_id = args.get("doc_id", "")
-                                res = read_library_document(doc_id)
-                                output_text = res["content"] if res.get("success") else res.get("error", "Virhe")
-                                out_msg = f"\n📚 *[Luettu viitedokumentti: {doc_id}]*\n```\n{output_text[:600]}...\n```\n"
-                                parts.append(out_msg)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
-                            elif fn_name == "list_library_docs":
-                                docs = list_library_documents()
-                                docs_summary = "\n".join([f"- {d['filename']} ({d['char_count']} merkkiä): {d['summary']}" for d in docs]) or "(kirjasto on tyhjä)"
-                                out_msg = f"\n📚 *[Kirjaston dokumentit:]*\n{docs_summary}\n"
-                                parts.append(out_msg)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
-                            elif fn_name == "read_local_file":
-                                path_val = args.get("path", "")
-                                res = read_local_file_content(path_val)
-                                out_msg = f"\n📂 *[Luettu paikallinen tiedosto: `{path_val}`]*\n```\n{res['output'][:600]}...\n```\n"
-                                parts.append(out_msg)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
-                            elif fn_name == "list_local_directory":
-                                dir_path = args.get("path", "")
-                                res = list_local_directory_contents(dir_path)
-                                out_msg = f"\n📁 *[Kansion sisältö: `{dir_path}`]*\n```\n{res['output']}\n```\n"
-                                parts.append(out_msg)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": out_msg})
+                            chat_msg, raw_result = execute_tool_call(fn_name, args)
+                            parts.append(chat_msg)
+                            yield sse({"type": "token", "id": p.id, "name": p.name, "text": chat_msg})
 
-                    # 2. Automaattinen suoritus (Koodilohkojen tunnistus):
-                    # Jos malli kirjoitti koodilohkon (```python ... ```) suoraan tekstinä,
-                    # suoritetaan koodi automaattisesti taustalla ja näytetään tuloste ilman keinotekoisia pituusrajoituksia!
+                            # Lisätään tulos mallin kontekstiin
+                            current_model_messages.append({
+                                "role": "tool",
+                                "tool_call_id": call_id,
+                                "name": fn_name,
+                                "content": raw_result or "(ei tulostetta)"
+                            })
+                        
+                        # Ilmoitetaan että malli analysoi tuloksia
+                        yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n💬 *[Analysoidaan tulosta...]*\n\n"})
+
+                    # 2. Automaattinen suoritus koodilohkoille jos malli kirjoitti suoraan ```python:
                     full_text_so_far = "".join(parts)
                     code_blocks = re.findall(r"```python\s*(.*?)\s*```", full_text_so_far, re.DOTALL)
-                    if code_blocks and not tool_calls_accumulator:
+                    if code_blocks and not ("⚡ **Koodin ajotulos" in full_text_so_far or "⚡ *[Suoritetaan työkalua" in full_text_so_far):
                         last_code = code_blocks[-1].strip()
-                        # Suoritetaan mikä tahansa Python-koodilohko (luokat, funktiot, skriptit jne.)
                         if len(last_code) > 0 and len(last_code) < 50000:
                             res = run_python_code(last_code, timeout_sec=30)
                             if res["output"] and res["output"] != "(ei tulostetta)":

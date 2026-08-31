@@ -4,44 +4,46 @@
       "id": "seppo",
       "name": "Seppo",
       "role": "Strategi & Ideageneraattori",
-      "model": "openrouter/free",
+      "model": "openai/gpt-4o",
       "system_prompt": "Olet Seppo, ennakkoluuloton kvantitatiivinen strategi ja ideageneraattori. Tuot rohkeita, uusia ideoita pöytään, haastat vanhoja toimintamalleja ja etsit epäsymmetrisiä mahdollisuuksia. Keskustele rakentavasti muiden kanssa suomeksi."
     },
     "matti": {
       "id": "matti",
       "name": "Matti",
       "role": "Matemaatikko & Kriitikko",
-      "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "model": "deepseek/deepseek-r1",
       "system_prompt": "Olet Matti, armoton matemaatikko ja kriitikko, joka vaatii tieteellistä kurinalaisuutta, tilastollista validiteettia ja kovaa dataa. Ammut heppoiset oletukset alas ja vaadit todisteita. Keskustele tiiviisti ja suomeksi."
     },
     "aki": {
       "id": "aki",
       "name": "Aki",
       "role": "Järjestelmäarkkitehti",
-      "model": "minimax/minimax-m2.7:free",
+      "model": "google/gemini-2.5-flash",
       "system_prompt": "Olet Aki, käytännönläheinen arkkitehti, joka pitää huolen resurssirajoitteista, skaalautuvuudesta, latensseista ja infrastruktuurin kestävyydestä. Tuo esiin tekniset reaaliteetit. Keskustele tiiviisti ja suomeksi."
     },
     "kolli": {
       "id": "kolli",
       "name": "Kolli",
       "role": "Pääkoodari",
-      "model": "cohere/north-mini-code:free",
+      "model": "openai/gpt-4o-mini",
       "system_prompt": "Olet Kolli, tehokas pääkoodari, joka muuttaa ideat ja arkkitehtuurit puhtaaksi, suorituskykyiseksi Python-koodiksi ja konkreettisiksi tietorakenteiksi. Keskustele tiiviisti ja suomeksi."
     },
     "legal": {
       "id": "legal",
       "name": "Legal",
       "role": "Riskit ja Compliance",
-      "model": "openrouter/free",
+      "model": "deepseek/deepseek-chat",
       "system_prompt": "Olet Legal-asiantuntija, joka valvoo sääntelyä, API-rajoituksia, lisenssejä ja sopimus- sekä operatiivisia riskejä. Varmistat, ettei suunnitelma kaadu lainopillisiin sudenkuoppiin. Keskustele tiiviisti ja suomeksi."
     }
   },
   "model_pricing": {
-    "openrouter/free": { "prompt": 0.0, "completion": 0.0 },
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": { "prompt": 0.0, "completion": 0.0 },
-    "minimax/minimax-m2.7:free": { "prompt": 0.0, "completion": 0.0 },
-    "cohere/north-mini-code:free": { "prompt": 0.0, "completion": 0.0 },
-    "default": { "prompt": 0.0, "completion": 0.0 }
+    "openai/gpt-4o": { "prompt": 2.50, "completion": 10.00 },
+    "deepseek/deepseek-r1": { "prompt": 0.70, "completion": 2.50 },
+    "google/gemini-2.5-flash": { "prompt": 0.30, "completion": 2.50 },
+    "openai/gpt-4o-mini": { "prompt": 0.15, "completion": 0.60 },
+    "deepseek/deepseek-chat": { "prompt": 0.26, "completion": 1.03 },
+    "anthropic/claude-sonnet-4.5": { "prompt": 3.00, "completion": 15.00 },
+    "default": { "prompt": 1.00, "completion": 3.00 }
   },
   "user_profile": {
     "id": "user",
@@ -50,6 +52,6 @@
     "is_human": true
   },
   "default_active": ["seppo", "matti", "aki", "kolli"],
-  "editor_model": "openrouter/free",
+  "editor_model": "anthropic/claude-sonnet-4.5",
   "max_history_messages": 10
 }

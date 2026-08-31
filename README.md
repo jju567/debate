@@ -71,6 +71,7 @@ Avaa selaimessa: **http://localhost:8002**
 | `agents.json` | Agenttien roolit, `system_prompt`-kehotteet, OpenRouter-mallit ja hinnoittelut |
 | `llm.py` | OpenRouter SSE-streamaus ja token-käytön (usage) sieppaus |
 | `tools.py` | Agenttien työkalut (Python-suoritus, REPL, verkkohaku, tiedostoluku jne.) |
+| `tool_executor.py` | Työkalukutsujen suoritus, lokitus ja tulosten syöttö takaisin malleille (Agent Tool Loop) |
 | `library.py` | Viitedokumenttikirjaston hallinta |
 | `storage_routes.py` | Aiheiden (topics) ja kirjastotiedostojen REST-reitit |
 | `static/index.html` | Käyttöliittymä: agenttivalitsin, chat, token/hintalaskuri ja markdown-dokumenttipaneeli |
