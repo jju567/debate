@@ -17,11 +17,20 @@ class LLMError(Exception):
     """OpenRouter-kutsu epäonnistui."""
 
 
-async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api_key: str, tools: list | None = None):
+async def stream_chat(
+    client: httpx.AsyncClient,
+    model: str,
+    messages: list,
+    api_key: str,
+    tools: list | None = None,
+    allow_fallback: bool = True,
+    fallback_model: str = "openrouter/free",
+):
     """Async-generaattori, joka tuottaa tekstipaloja ja työkalukutsuja yhdeltä mallilta.
 
     Kokoaa streamaavat tool_calls-deltalohkot oikein indeksin mukaan.
-    Heittää LLMError-poikkeuksen jos kutsu epäonnistuu.
+    Jos pyyntö epäonnistuu saldon loppumiseen (HTTP 402) ja allow_fallback=True,
+    siirtyy automaattisesti käyttämään ilmaista varamallia (fallback_model).
     """
     payload = {
         "model": model,
@@ -44,6 +53,31 @@ async def stream_chat(client: httpx.AsyncClient, model: str, messages: list, api
     async with client.stream(
         "POST", OPENROUTER_URL, json=payload, headers=headers, timeout=timeout_config
     ) as resp:
+        if resp.status_code in (402, 429) and allow_fallback and model != fallback_model:
+            body = await resp.aread()
+            err_text = body.decode(errors="replace")[:400]
+            logger.warning(
+                f"OpenRouter HTTP {resp.status_code} ({model}): Saldo tai limiitti loppu. Siirrytään ilmaiseen varamalliin ({fallback_model}). Virhe: {err_text}"
+            )
+            # Ilmoitetaan varamallin aktivoinnista
+            yield {
+                "type": "fallback_triggered",
+                "original_model": model,
+                "fallback_model": fallback_model,
+                "reason": f"HTTP {resp.status_code} - Saldo tai limiitti loppu. Siirrytty ilmaismalliin.",
+            }
+            # Kutsutaan varamallia ilman lisä-fallbackia silmukan välttämiseksi
+            async for fallback_event in stream_chat(
+                client=client,
+                model=fallback_model,
+                messages=messages,
+                api_key=api_key,
+                tools=tools,
+                allow_fallback=False,
+            ):
+                yield fallback_event
+            return
+
         if resp.status_code != 200:
             body = await resp.aread()
             err_text = body.decode(errors="replace")[:500]

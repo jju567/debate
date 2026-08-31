@@ -8,6 +8,12 @@ Kaikki mallit kulkevat yhden **OpenRouter**-avaimen kautta, joten voit sekoittaa
 
 ## Ominaisuudet
 
+- **Agenttikohtaiset Ilmaiset Varamallit (Backup / Fallback)**: Jos ostettu tai määritetty malli antaa virheen (kuten saldo loppu HTTP 402, tai limiitti HTTP 429), järjestelmä siirtyy automaattisesti roolikohtaisesti parhaaseen **ilmaiseen** varamalliin:
+  - **Kolli** (Koodaus) ➔ `cohere/north-mini-code:free`
+  - **Matti** (Matematiikka & Logiikka) ➔ `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`
+  - **Aki** & **Legal** (Arkkitehtuuri & Sääntely) ➔ `nvidia/nemotron-3-super-120b-a12b:free`
+  - **Seppo** (Strategia & Ideointi) ➔ `minimax/minimax-m3:free`
+  - **Editori** (Dokumentin kokoaminen) ➔ `openrouter/free`
 - **Dokumenttikirjasto & Paikalliset Viitteet**: Voit viitata sekä ladattuihin viitetiedostoihin (`data/library/`) että tietokoneella jo oleviin kansioihin ja tiedostoihin. Tiedostot eivät paisuta kontekstia pysyvästi, vaan agentit lukevat niitä tarpeen mukaan.
 - **Työkalujen Suoritus (Tool Calling, REPL, Verkkohaku & Tiedostoluku)**: Agenteilla on monipuolinen työkalupakki:
   - `read_local_file`: Lukee koneella olemassa olevan paikallisen tiedoston sisällön (esim. `trade/main.py`).

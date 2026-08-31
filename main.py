@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from config import load_agents_config, DEFAULT_EDITOR_MODEL, MAX_HISTORY_MESSAGES
 from llm import stream_chat, LLMError
+from model_router import resolve_model, get_fallback_model, FREE_FALLBACK_MODEL
 from tools import TOOLS, run_python_code
 from tool_executor import execute_tool_call
 from storage_routes import router as storage_router
@@ -240,14 +241,6 @@ async def respond(req: RespondRequest):
         async with httpx.AsyncClient() as client:
             # 1. Osallistujat vastaavat
             for p in selected_participants:
-                yield sse({
-                    "type": "message_start",
-                    "id": p.id,
-                    "model": p.model,
-                    "name": p.name,
-                    "role": p.role
-                })
-                
                 system_prompt = p.system_prompt or (
                     f"Olet {p.name}, rooliltasi {p.role}. Osallistut järjestelmäsuunnitteluun. "
                     "Keskustele rakentavasti ja vie asioita eteenpäin tiiviisti suomeksi."
@@ -255,19 +248,43 @@ async def respond(req: RespondRequest):
                 messages = [{"role": "system", "content": system_prompt}]
                 messages += conversation_for_model(working, p.id, req.document, window_size=window_size)
                 
+                # Määritetään suoritettava malli (huomioi dynaaminen auto-valinta)
+                actual_model = resolve_model(p.model, p.id, messages=messages)
+
+                yield sse({
+                    "type": "message_start",
+                    "id": p.id,
+                    "model": actual_model,
+                    "name": p.name,
+                    "role": p.role
+                })
+                
                 parts: list[str] = []
                 try:
                     # Mallille annetaan työkalut (esim. execute_python)
                     current_model_messages = list(messages)
                     
                     # Agent Tool Loop (max 2 kierrosta: 1. suoritus, 2. kommentointi)
+                    p_fallback_model = get_fallback_model(p.id)
                     for loop_step in range(2):
                         tool_calls_complete = []
-                        async for event in stream_chat(client, p.model, current_model_messages, api_key, tools=TOOLS if loop_step == 0 else None):
+                        async for event in stream_chat(
+                            client,
+                            actual_model,
+                            current_model_messages,
+                            api_key,
+                            tools=TOOLS if loop_step == 0 else None,
+                            fallback_model=p_fallback_model
+                        ):
                             if event["type"] == "text":
                                 chunk = event["text"]
                                 parts.append(chunk)
                                 yield sse({"type": "token", "id": p.id, "name": p.name, "text": chunk})
+                            elif event["type"] == "fallback_triggered":
+                                actual_model = event["fallback_model"]
+                                notice = f"\n\n🛡️ *[Varajärjestelmä aktivoitu: {event['reason']} Käytetään ilmaista mallia: {actual_model}]*\n\n"
+                                parts.append(notice)
+                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": notice})
                             elif event["type"] == "tool_calls_complete":
                                 tool_calls_complete = event["tool_calls"]
                             elif event["type"] == "usage":
@@ -275,7 +292,7 @@ async def respond(req: RespondRequest):
                                     "type": "usage",
                                     "id": p.id,
                                     "name": p.name,
-                                    "model": p.model,
+                                    "model": actual_model,
                                     "usage": event["usage"]
                                 })
 
@@ -358,18 +375,21 @@ async def respond(req: RespondRequest):
                 ]
                 
                 doc_parts: list[str] = []
+                actual_editor_model = resolve_model(editor_model, "editor", messages=doc_messages)
                 try:
-                    async for event in stream_chat(client, editor_model, doc_messages, api_key):
+                    async for event in stream_chat(client, actual_editor_model, doc_messages, api_key):
                         if event["type"] == "text":
                             chunk = event["text"]
                             doc_parts.append(chunk)
                             yield sse({"type": "doc_auto_update_token", "text": chunk})
+                        elif event["type"] == "fallback_triggered":
+                            actual_editor_model = event["fallback_model"]
                         elif event["type"] == "usage":
                             yield sse({
                                 "type": "usage",
                                 "id": "editor",
                                 "name": "Editori",
-                                "model": editor_model,
+                                "model": actual_editor_model,
                                 "usage": event["usage"]
                             })
                     updated_doc = "".join(doc_parts).strip()
@@ -414,17 +434,20 @@ async def document(req: DocumentRequest):
         ]
 
         yield sse({"type": "doc_start"})
+        actual_model = resolve_model(req.editor_model, "editor", messages=messages)
         async with httpx.AsyncClient() as client:
             try:
-                async for event in stream_chat(client, req.editor_model, messages, api_key):
+                async for event in stream_chat(client, actual_model, messages, api_key):
                     if event["type"] == "text":
                         yield sse({"type": "doc_token", "text": event["text"]})
+                    elif event["type"] == "fallback_triggered":
+                        actual_model = event["fallback_model"]
                     elif event["type"] == "usage":
                         yield sse({
                             "type": "usage",
                             "id": "editor",
                             "name": "Editori",
-                            "model": req.editor_model,
+                            "model": actual_model,
                             "usage": event["usage"]
                         })
             except LLMError as e:

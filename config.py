@@ -24,7 +24,7 @@ FALLBACK_PARTICIPANTS = {
         "id": "matti",
         "name": "Matti",
         "role": "Matemaatikko & Kriitikko",
-        "model": "anthropic/claude-3.5-sonnet",
+        "model": "deepseek/deepseek-r1",
         "system_prompt": (
             "Olet Matti, armoton matemaatikko ja kriitikko, joka vaatii tieteellistä kurinalaisuutta, "
             "tilastollista validiteettia ja kovaa dataa. Ammut heppoiset oletukset alas ja vaadit todisteita. "
@@ -35,7 +35,7 @@ FALLBACK_PARTICIPANTS = {
         "id": "aki",
         "name": "Aki",
         "role": "Järjestelmäarkkitehti",
-        "model": "google/gemini-2.0-flash-001",
+        "model": "openai/gpt-4o-mini",
         "system_prompt": (
             "Olet Aki, käytännönläheinen arkkitehti, joka pitää huolen resurssirajoitteista, "
             "skaalautuvuudesta, latensseista ja infrastruktuurin kestävyydestä. Tuo esiin tekniset reaaliteetit. "
@@ -57,7 +57,7 @@ FALLBACK_PARTICIPANTS = {
         "id": "legal",
         "name": "Legal",
         "role": "Riskit ja Compliance",
-        "model": "anthropic/claude-3.5-sonnet",
+        "model": "deepseek/deepseek-chat",
         "system_prompt": (
             "Olet Legal-asiantuntija, joka valvoo sääntelyä, API-rajoituksia, lisenssejä ja "
             "sopimus- sekä operatiivisia riskejä. Varmistat, ettei suunnitelma kaadu lainopillisiin sudenkuoppiin. "
@@ -87,19 +87,19 @@ def load_agents_config() -> dict:
                 }
         except Exception:
             pass
-    return {
-        "participants": FALLBACK_PARTICIPANTS,
-        "default_active": ["seppo", "matti", "aki", "kolli"],
-        "editor_model": "openrouter/free",
-        "max_history_messages": 10,
-        "model_pricing": {},
-        "user_profile": {
-            "id": "user",
-            "name": "Käyttäjä",
-            "role": "Tuoteomistaja",
-            "is_human": True
-        },
-    }
+        return {
+            "participants": FALLBACK_PARTICIPANTS,
+            "default_active": ["seppo", "matti", "aki", "kolli"],
+            "editor_model": "anthropic/claude-3.5-sonnet",
+            "max_history_messages": 8,
+            "model_pricing": {},
+            "user_profile": {
+                "id": "user",
+                "name": "Käyttäjä",
+                "role": "Tuoteomistaja",
+                "is_human": True
+            },
+        }
 
 
 # Alustava lataus
