@@ -41,7 +41,7 @@
     "deepseek/deepseek-r1": { "prompt": 0.70, "completion": 2.50 },
     "openai/gpt-4o-mini": { "prompt": 0.15, "completion": 0.60 },
     "deepseek/deepseek-chat": { "prompt": 0.26, "completion": 1.03 },
-    "anthropic/claude-3.5-sonnet": { "prompt": 3.00, "completion": 15.00 },
+    "anthropic/claude-sonnet-4.5": { "prompt": 3.00, "completion": 15.00 },
     "minimax/minimax-m3:free": { "prompt": 0.0, "completion": 0.0 },
     "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free": { "prompt": 0.0, "completion": 0.0 },
     "nvidia/nemotron-3-super-120b-a12b:free": { "prompt": 0.0, "completion": 0.0 },
@@ -56,6 +56,6 @@
     "is_human": true
   },
   "default_active": ["seppo", "matti", "aki", "kolli"],
-  "editor_model": "anthropic/claude-3.5-sonnet",
+  "editor_model": "anthropic/claude-sonnet-4.5",
   "max_history_messages": 8
 }

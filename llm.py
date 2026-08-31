@@ -53,18 +53,18 @@ async def stream_chat(
     async with client.stream(
         "POST", OPENROUTER_URL, json=payload, headers=headers, timeout=timeout_config
     ) as resp:
-        if resp.status_code in (402, 429) and allow_fallback and model != fallback_model:
+        if resp.status_code in (400, 402, 404, 429, 500, 502, 503) and allow_fallback and model != fallback_model:
             body = await resp.aread()
             err_text = body.decode(errors="replace")[:400]
             logger.warning(
-                f"OpenRouter HTTP {resp.status_code} ({model}): Saldo tai limiitti loppu. Siirrytään ilmaiseen varamalliin ({fallback_model}). Virhe: {err_text}"
+                f"OpenRouter HTTP {resp.status_code} ({model}): Malli ei saatavilla tai saldo loppu. Siirrytään ilmaiseen varamalliin ({fallback_model}). Virhe: {err_text}"
             )
             # Ilmoitetaan varamallin aktivoinnista
             yield {
                 "type": "fallback_triggered",
                 "original_model": model,
                 "fallback_model": fallback_model,
-                "reason": f"HTTP {resp.status_code} - Saldo tai limiitti loppu. Siirrytty ilmaismalliin.",
+                "reason": f"HTTP {resp.status_code} ({model}) - Siirrytty ilmaiseen varamalliin.",
             }
             # Kutsutaan varamallia ilman lisä-fallbackia silmukan välttämiseksi
             async for fallback_event in stream_chat(

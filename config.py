@@ -90,7 +90,7 @@ def load_agents_config() -> dict:
         return {
             "participants": FALLBACK_PARTICIPANTS,
             "default_active": ["seppo", "matti", "aki", "kolli"],
-            "editor_model": "anthropic/claude-3.5-sonnet",
+            "editor_model": "anthropic/claude-sonnet-4.5",
             "max_history_messages": 8,
             "model_pricing": {},
             "user_profile": {
