@@ -160,9 +160,64 @@ LIST_LOCAL_DIRECTORY_TOOL = {
     }
 }
 
+START_BACKGROUND_JOB_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "start_background_job",
+        "description": "Käynnistä raskas laskenta, kvantitatiivinen simulaatio, datan prosessointi tai pitkäkestoinen Python-skripti taustalle ilman aikarajaa. Palauttaa job_id:n.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Suoritettava Python-koodi."
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Laskennan kuvaava nimi (esim. 'volatiliteetti_simulaatio' tai 'data_aggregaatio')."
+                }
+            },
+            "required": ["code"]
+        }
+    }
+}
+
+CHECK_JOB_STATUS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "check_job_status",
+        "description": "Tarkista käynnissä olevan tai valmistuneen taustalaskennan tila ja lue uusimmat lokitulosteet job_id:n perusteella.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "job_id": {
+                    "type": "string",
+                    "description": "Taustatyön tunniste (esim. 'job_a1b2c3d4')."
+                }
+            },
+            "required": ["job_id"]
+        }
+    }
+}
+
+LIST_BACKGROUND_JOBS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "list_background_jobs",
+        "description": "Listaa kaikki järjestelmässä käynnistetyt taustalaskennat ja niiden tilat.",
+        "parameters": {
+            "type": "object",
+            "properties": {}
+        }
+    }
+}
+
 TOOLS = [
     EXECUTE_PYTHON_TOOL,
     EVAL_PYTHON_TOOL,
+    START_BACKGROUND_JOB_TOOL,
+    CHECK_JOB_STATUS_TOOL,
+    LIST_BACKGROUND_JOBS_TOOL,
     WEB_SEARCH_TOOL,
     FETCH_WEBPAGE_TOOL,
     READ_LIBRARY_DOC_TOOL,

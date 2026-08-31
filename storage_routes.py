@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from library import list_library_documents, save_library_document, read_library_document, delete_library_document
+from background_jobs import list_background_jobs, get_job_status
 
 router = APIRouter()
 DATA_DIR = Path(__file__).parent / "data"
@@ -121,3 +122,17 @@ async def save_topic(req: TopicSaveRequest):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(topic_data, f, ensure_ascii=False, indent=2)
     return {"ok": True, "topic": topic_data}
+
+
+# ---------- Taustatyöt (Background Jobs) ----------
+
+@router.get("/api/jobs")
+async def get_jobs():
+    """Listaa kaikki taustalaskentatyöt."""
+    return {"jobs": list_background_jobs()}
+
+
+@router.get("/api/jobs/{job_id}")
+async def get_job_info(job_id: str):
+    """Hae yksittäisen taustalaskennan tila ja tuoreimmat lokit."""
+    return get_job_status(job_id)

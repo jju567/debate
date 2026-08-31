@@ -237,16 +237,28 @@
       border: 1px solid var(--border-color);
     }
 
-    .message-header {
-      display: flex;
+    .thinking-placeholder {
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-      padding-bottom: 4px;
-      margin-bottom: 4px;
+      gap: 6px;
+      color: #94a3b8;
+      font-size: 0.85rem;
+      font-style: italic;
+      padding: 4px 0;
+    }
+    .thinking-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #60a5fa;
+      animation: pulse-dot 1.2s infinite ease-in-out;
+    }
+    .thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+    .thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes pulse-dot {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1.2); opacity: 1; }
     }
 
     .message-author { font-weight: 600; color: #60a5fa; }
@@ -791,7 +803,17 @@
       msg.className = `message ${role}`;
       
       let renderedContent = text;
-      if (text && typeof marked !== "undefined") {
+      if (!text && role === "assistant") {
+        // Näytetään välitön vilkkuva mietintäindikaattori
+        renderedContent = `
+          <div class="thinking-placeholder">
+            <span>Miettii ja analysoi</span>
+            <div class="thinking-dot"></div>
+            <div class="thinking-dot"></div>
+            <div class="thinking-dot"></div>
+          </div>
+        `;
+      } else if (text && typeof marked !== "undefined") {
         renderedContent = marked.parse(text);
       }
 
@@ -809,16 +831,33 @@
       return msg;
     }
 
+    let renderPending = false;
+    let latestStreamText = "";
+    let latestStreamEl = null;
+
     function updateStreamingMessage(msgEl, text) {
       if (!msgEl) return;
-      const bodyEl = msgEl.querySelector(".message-body");
-      if (typeof marked !== "undefined") {
-        bodyEl.innerHTML = marked.parse(text);
-        bodyEl.className = "message-body rendered-md";
-      } else {
-        bodyEl.textContent = text;
+      latestStreamEl = msgEl;
+      latestStreamText = text;
+
+      if (!renderPending) {
+        renderPending = true;
+        requestAnimationFrame(() => {
+          if (latestStreamEl) {
+            const bodyEl = latestStreamEl.querySelector(".message-body");
+            if (bodyEl) {
+              if (typeof marked !== "undefined") {
+                bodyEl.innerHTML = marked.parse(latestStreamText);
+                bodyEl.className = "message-body rendered-md";
+              } else {
+                bodyEl.textContent = latestStreamText;
+              }
+            }
+            scrollChatToBottom();
+          }
+          renderPending = false;
+        });
       }
-      scrollChatToBottom();
     }
 
     let userScrolledUp = false;
@@ -829,9 +868,9 @@
       if (!chat) return;
       
       chat.addEventListener("scroll", () => {
-        // Jos käyttäjä on vierittänyt yli 60px ylöspäin pohjalta, asetetaan autoscroll pauselle
+        // Jos käyttäjä on vierittänyt yli 30px ylöspäin pohjalta, asetetaan autoscroll pauselle
         const distanceFromBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
-        if (distanceFromBottom > 60) {
+        if (distanceFromBottom > 30) {
           userScrolledUp = true;
           const resumeBtn = document.getElementById("resume-scroll-btn");
           if (resumeBtn) resumeBtn.style.display = "inline-block";
@@ -840,7 +879,7 @@
           const resumeBtn = document.getElementById("resume-scroll-btn");
           if (resumeBtn) resumeBtn.style.display = "none";
         }
-      });
+      }, { passive: true });
     }
 
     function resumeAutoScroll() {
@@ -851,18 +890,30 @@
     }
 
     function scrollChatToBottom(force = false) {
-      if (userScrolledUp && !force) return; // Älä vieritä jos käyttäjä lukee ylempää!
+      if (userScrolledUp && !force) return; // Älä vieritä väkisin jos käyttäjä lukee vanhoja viestejä!
       const chat = document.getElementById("chat-messages");
       if (!chat) return;
       chat.scrollTop = chat.scrollHeight;
     }
 
+    let docRenderPending = false;
+    let latestDocMarkdown = "";
+
     function renderMarkdown(md) {
-      const contentEl = document.getElementById("doc-content");
-      if (typeof marked !== "undefined") {
-        contentEl.innerHTML = marked.parse(md);
-      } else {
-        contentEl.textContent = md;
+      latestDocMarkdown = md;
+      if (!docRenderPending) {
+        docRenderPending = true;
+        requestAnimationFrame(() => {
+          const contentEl = document.getElementById("doc-content");
+          if (contentEl) {
+            if (typeof marked !== "undefined") {
+              contentEl.innerHTML = marked.parse(latestDocMarkdown);
+            } else {
+              contentEl.textContent = latestDocMarkdown;
+            }
+          }
+          docRenderPending = false;
+        });
       }
     }
 

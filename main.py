@@ -341,9 +341,10 @@ async def respond(req: RespondRequest):
                     if code_blocks and not ("⚡ **Koodin ajotulos" in full_text_so_far or "⚡ *[Suoritetaan työkalua" in full_text_so_far):
                         last_code = code_blocks[-1].strip()
                         if len(last_code) > 0 and len(last_code) < 50000:
-                            res = run_python_code(last_code, timeout_sec=30)
+                            yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n\n⚡ *[Ajetaan koodia automaattisesti...]*\n"})
+                            res = run_python_code(last_code, timeout_sec=5)
                             if res["output"] and res["output"] != "(ei tulostetta)":
-                                exec_banner = f"\n\n⚡ **Koodin ajotulos (Automaattinen suoritus):**\n```\n{res['output']}\n```\n"
+                                exec_banner = f"\n\n⚡ **Koodin ajotulos:**\n```\n{res['output']}\n```\n"
                                 parts.append(exec_banner)
                                 yield sse({"type": "token", "id": p.id, "name": p.name, "text": exec_banner})
                             elif res.get("stderr"):

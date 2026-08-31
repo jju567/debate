@@ -11,6 +11,7 @@ from tools import (
     list_local_directory_contents,
 )
 from library import read_library_document, list_library_documents
+from background_jobs import start_background_job, get_job_status, list_background_jobs
 
 logger = logging.getLogger("debate.tool_executor")
 logger.setLevel(logging.INFO)
@@ -33,6 +34,45 @@ def execute_tool_call(fn_name: str, args: dict) -> tuple[str, str]:
             f"**⚡ Tuloste:**\n```\n{output_str}\n```\n"
         )
         return out_msg, output_str
+
+    elif fn_name == "start_background_job":
+        code_to_run = args.get("code", "")
+        job_name = args.get("name", "laskenta")
+        res = start_background_job(code_to_run, job_name)
+        job_id = res.get("job_id", "")
+        out_msg = (
+            f"\n🚀 **[Taustalaskenta käynnistetty]**\n"
+            f"- **Nimi:** {job_name}\n"
+            f"- **Job ID:** `{job_id}`\n"
+            f"- *Laskenta suoritetaan omassa taustaprosessissa ilman aikarajaa. Tarkista tila: `check_job_status(job_id=\"{job_id}\")`*\n"
+        )
+        return out_msg, json.dumps(res, ensure_ascii=False)
+
+    elif fn_name == "check_job_status":
+        job_id = args.get("job_id", "")
+        res = get_job_status(job_id)
+        if not res.get("success"):
+            err_text = res.get("error", "Virhe")
+            return f"\n⚠️ **Virhe taustatyössä:** {err_text}\n", err_text
+        
+        status = res.get("status")
+        runtime = res.get("runtime_sec", 0)
+        logs = res.get("recent_logs", "")
+        out_msg = (
+            f"\n⏱️ **[Taustatyön tila: `{job_id}`]**\n"
+            f"- **Tila:** `{status}` (kesto: {runtime}s)\n"
+            f"**Uusimmat lokitulosteet:**\n```\n{logs}\n```\n"
+        )
+        return out_msg, json.dumps(res, ensure_ascii=False)
+
+    elif fn_name == "list_background_jobs":
+        jobs = list_background_jobs()
+        if not jobs:
+            summary = "(ei käynnistettyjä taustalaskentoja)"
+        else:
+            summary = "\n".join([f"- `{j['job_id']}` ({j['name']}): status `{j['status']}`" for j in jobs])
+        out_msg = f"\n📋 **[Kaikki taustatyöt:]**\n{summary}\n"
+        return out_msg, summary
 
     elif fn_name == "eval_python_expression":
         expr_to_run = args.get("code_or_expr", "")
