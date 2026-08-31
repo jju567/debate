@@ -16,15 +16,16 @@ Kaikki mallit kulkevat yhden **OpenRouter**-avaimen kautta, joten voit sekoittaa
   - **Editori** (Dokumentin kokoaminen) ➔ `openrouter/free`
 - **Dokumenttikirjasto & Paikalliset Viitteet**: Voit viitata sekä ladattuihin viitetiedostoihin (`data/library/`) että tietokoneella jo oleviin kansioihin ja tiedostoihin. Tiedostot eivät paisuta kontekstia pysyvästi, vaan agentit lukevat niitä tarpeen mukaan.
 - **Asynkroninen Taustalaskenta & Työjono (`background_jobs.py`)**: Raskaat simulaatiot, monimutkaiset data-ajot ja pitkäkestoiset Python-skriptit suoritetaan omassa taustaprosessissaan ilman HTTP/SSE-aikakatkaisurajoituksia (`start_background_job`, `check_job_status`, `list_background_jobs`).
-- **Työkalujen Suoritus (Tool Calling, REPL, Verkkohaku & Tiedostoluku)**: Agenteilla on monipuolinen työkalupakki:
-  - `start_background_job` & `check_job_status`: Asynkroninen raskas taustalaskenta ilman aikarajoja.
-  - `read_local_file`: Lukee koneella olemassa olevan paikallisen tiedoston sisällön (esim. `trade/main.py`).
+- **Työkalujen Suoritus (Tool Calling, REPL, Verkkohaku, Tiedoston Luonti & Luku)**: Agenteilla on monipuolinen työkalupakki:
+  - `write_local_file`: Luo tai tallentaa koodit, skriptit ja tiedostot suoraan levylle (esim. `work/skripti.py` tai `scripts/...`).
+  - `start_background_job` & `check_job_status`: Asynkroninen raskas taustalaskenta ilman aikarajoja (Polars, laaja data, simulaatiot).
+  - `read_local_file`: Lukee koneella olemassa olevan paikallisen tiedoston sisällön (esim. `work/polars2.py`).
   - `list_local_directory`: Listaa paikallisen kansion tiedostorakenteen katsausta varten.
   - `read_library_doc` & `list_library_docs`: Lukee käyttäjän lataamia kirjastodokumentteja.
   - `web_search`: Etsii ajantasaista tietoa ja teknologiavertailuja verkosta (DuckDuckGo).
   - `fetch_webpage`: Lukee ja siistii annettujen verkkosivujen ja dokumentaatioiden sisällön.
   - `eval_python_expression`: Salamannopea in-memory Python REPL kevyisiin laskelmiin.
-  - `execute_python`: Eristetty nopea Python-skriptien suoritus (`py -3`).
+  - `execute_python`: Eristetty nopea Python-skriptien pikatestaus (`py -3`, < 15s).
 - **Aiheiden Hallinta & Tallennus (`data/topics/`)**: Keskustelut, dokumenttiluonnokset ja token-tilastot tallentuvat automaattisesti aihekohtaisesti. Voit luoda uusia aiheita, nimetä niitä ja vaihtaa vanhojen aiheiden välillä suoraan käyttöliittymästä.
 - **Täsmäkutsu (@mention)**: Voit kutsua asiantuntijoita suoraan nimellä (esim. `@kolli`, `@matti`, `@aki`), jolloin vain mainitut agentit vastaavat ja turha automaattinen kehä vältetään.
 - **Dynaamiset Agentit & Roolit**: Agenttien roolit, mallit ja järjestelmäkehotteet määritellään tiedostossa [`agents.json`](agents.json). Uusien agenttien lisäys onnistuu suoraan JSONia muokkaamalla.
@@ -75,6 +76,7 @@ Avaa selaimessa: **http://localhost:8002**
 | Tiedosto / Kansio | Vastuu |
 |---|---|
 | `main.py` | FastAPI-backend, streamaavat SSE-päätepisteet (`/api/respond`, `/api/document`), automaattinen päivitys ja tallennus |
+| `schemas.py` | Pydantic-tietomallit ja pyyntörakenteet |
 | `config.py` | Dynaamisen konfiguraation latauslogiikka ja oletusarvot |
 | `agents.json` | Agenttien roolit, `system_prompt`-kehotteet, OpenRouter-mallit ja hinnoittelut |
 | `llm.py` | OpenRouter SSE-streamaus ja token-käytön (usage) sieppaus |

@@ -212,9 +212,33 @@ LIST_BACKGROUND_JOBS_TOOL = {
     }
 }
 
+# 7. Paikallisten tiedostojen kirjoittaminen ja tallentaminen
+WRITE_LOCAL_FILE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "write_local_file",
+        "description": "Luo tai tallenna koodi, skripti tai tiedosto paikalliseen polkuun (esim. 'work/analyysi.py' tai 'scripts/my_script.py'). Luo tarvittavat kansiot automaattisesti.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Tiedoston tallennuspolku (suhteellinen tai absoluuttinen, esim. 'work/polars2.py')."
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Tiedostoon kirjoitettava koodi tai tekstisisältö."
+                }
+            },
+            "required": ["path", "content"]
+        }
+    }
+}
+
 TOOLS = [
     EXECUTE_PYTHON_TOOL,
     EVAL_PYTHON_TOOL,
+    WRITE_LOCAL_FILE_TOOL,
     START_BACKGROUND_JOB_TOOL,
     CHECK_JOB_STATUS_TOOL,
     LIST_BACKGROUND_JOBS_TOOL,
@@ -225,6 +249,21 @@ TOOLS = [
     READ_LOCAL_FILE_TOOL,
     LIST_LOCAL_DIRECTORY_TOOL
 ]
+
+
+def write_local_file_content(path_str: str, content: str) -> dict:
+    """Tallenna tai luo paikallinen tiedosto annetulla sisällöllä."""
+    try:
+        p = Path(path_str.strip().strip('"').strip("'"))
+        # Varmistetaan että vanhempikansio on olemassa
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+        return {
+            "success": True,
+            "output": f"Tiedosto tallennettu onnistuneesti: {p.as_posix()} ({len(content)} merkkiä, {len(content.splitlines())} riviä)"
+        }
+    except Exception as e:
+        return {"success": False, "output": f"Tiedoston tallennus epäonnistui: {e}"}
 
 
 def read_local_file_content(path_str: str, max_chars: int = 5000) -> dict:

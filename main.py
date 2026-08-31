@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
 
 from config import load_agents_config, DEFAULT_EDITOR_MODEL, MAX_HISTORY_MESSAGES
 from llm import stream_chat, LLMError
@@ -27,6 +26,14 @@ from model_router import resolve_model, get_fallback_model, FREE_FALLBACK_MODEL
 from tools import TOOLS, run_python_code
 from tool_executor import execute_tool_call
 from storage_routes import router as storage_router
+from schemas import (
+    Msg,
+    Participant,
+    RespondRequest,
+    DocumentRequest,
+    TopicSaveRequest,
+    SaveRequest,
+)
 
 load_dotenv()
 
@@ -37,56 +44,16 @@ DATA_DIR = Path(__file__).parent / "data"
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-# ---------- Pyyntömallit ----------
-
-class Msg(BaseModel):
-    role: str            # "user" | "assistant"
-    name: str            # "Käyttäjä" tai osallistujan nimi
-    model: str | None = None  # mallin id tai osallistuja-avain
-    content: str
-
-
-class Participant(BaseModel):
-    id: str
-    name: str
-    role: str
-    model: str
-    system_prompt: str | None = None
-
-
-class RespondRequest(BaseModel):
-    topic_id: str | None = "default"
-    conversation: list[Msg] = []
-    participants: list[Participant] | None = None
-    document: str = ""
-    auto_update_doc: bool = True
-    editor_model: str | None = None
-    max_history: int | None = None
-
-
-class DocumentRequest(BaseModel):
-    topic_id: str | None = "default"
-    conversation: list[Msg] = []
-    document: str = ""
-    instruction: str = ""
-    editor_model: str = DEFAULT_EDITOR_MODEL
-
-
-class TopicSaveRequest(BaseModel):
-    id: str
-    title: str
-    conversation: list[Msg] = []
-    document: str = ""
-    summary: str = ""
-    stats: dict = {}
-
-
-class SaveRequest(BaseModel):
-    filename: str
-    content: str
-
-
 # ---------- Kehotepohjat ----------
+
+AGENT_TOOL_INSTRUCTIONS = (
+    "\n\nTYÖKALU- JA TALLENNUSOHJEET:\n"
+    "- Tiedostojen tallennus: Käytä aina 'write_local_file(path, content)' skriptien tallentamiseen levylle (esim. 'work/analyysi.py').\n"
+    "- Koodin suoritus:\n"
+    "  * Pikatestit (< 10s): Käytä 'execute_python(code)' tai 'eval_python_expression(code_or_expr)'.\n"
+    "  * Raskaat laskennat ja iso data (Polars, Parquet, simulaatiot > 10s): Käytä AINA 'start_background_job(code, name)'. Se ei aikakatkea.\n"
+    "- Tiedostojen luku: 'read_local_file(path)' tai 'list_local_directory(path)'."
+)
 
 EDITOR_SYSTEM = (
     "Olet suunnitteludokumentin päätoimittaja. Kokoat paneelin keskustelusta "
@@ -241,10 +208,11 @@ async def respond(req: RespondRequest):
         async with httpx.AsyncClient() as client:
             # 1. Osallistujat vastaavat
             for p in selected_participants:
-                system_prompt = p.system_prompt or (
+                base_prompt = p.system_prompt or (
                     f"Olet {p.name}, rooliltasi {p.role}. Osallistut järjestelmäsuunnitteluun. "
                     "Keskustele rakentavasti ja vie asioita eteenpäin tiiviisti suomeksi."
                 )
+                system_prompt = base_prompt + AGENT_TOOL_INSTRUCTIONS
                 messages = [{"role": "system", "content": system_prompt}]
                 messages += conversation_for_model(working, p.id, req.document, window_size=window_size)
                 
@@ -338,11 +306,15 @@ async def respond(req: RespondRequest):
                     # 2. Automaattinen suoritus koodilohkoille jos malli kirjoitti suoraan ```python:
                     full_text_so_far = "".join(parts)
                     code_blocks = re.findall(r"```python\s*(.*?)\s*```", full_text_so_far, re.DOTALL)
-                    if code_blocks and not ("⚡ **Koodin ajotulos" in full_text_so_far or "⚡ *[Suoritetaan työkalua" in full_text_so_far):
+                    already_handled = any(marker in full_text_so_far for marker in [
+                        "⚡ **Koodin ajotulos", "⚡ *[Suoritetaan työkalua", "💾 **[Tiedosto tallennettu", "🚀 **[Taustalaskenta"
+                    ])
+                    if code_blocks and not already_handled:
                         last_code = code_blocks[-1].strip()
-                        if len(last_code) > 0 and len(last_code) < 50000:
+                        is_heavy = any(kw in last_code for kw in ["read_parquet", "scan_parquet", "start_background_job", "time.sleep", "glob.glob"])
+                        if len(last_code) > 0 and len(last_code) < 50000 and not is_heavy:
                             yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n\n⚡ *[Ajetaan koodia automaattisesti...]*\n"})
-                            res = run_python_code(last_code, timeout_sec=5)
+                            res = run_python_code(last_code, timeout_sec=10)
                             if res["output"] and res["output"] != "(ei tulostetta)":
                                 exec_banner = f"\n\n⚡ **Koodin ajotulos:**\n```\n{res['output']}\n```\n"
                                 parts.append(exec_banner)

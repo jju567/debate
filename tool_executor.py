@@ -8,6 +8,7 @@ from tools import (
     search_web,
     fetch_webpage_content,
     read_local_file_content,
+    write_local_file_content,
     list_local_directory_contents,
 )
 from library import read_library_document, list_library_documents
@@ -113,6 +114,14 @@ def execute_tool_call(fn_name: str, args: dict) -> tuple[str, str]:
         res = read_local_file_content(path_val)
         output_str = res.get("output", "")
         out_msg = f"\n📂 *[Luettu paikallinen tiedosto: `{path_val}`]*\n```\n{output_str[:600]}...\n```\n"
+        return out_msg, output_str
+
+    elif fn_name == "write_local_file":
+        path_val = args.get("path", "")
+        content_val = args.get("content", "")
+        res = write_local_file_content(path_val, content_val)
+        output_str = res.get("output", "")
+        out_msg = f"\n💾 **[Tiedosto tallennettu: `{path_val}`]**\n```\n{output_str}\n```\n"
         return out_msg, output_str
 
     elif fn_name == "list_local_directory":
