@@ -152,7 +152,7 @@
       flex-direction: column;
       gap: 16px;
       min-height: 0;
-      scroll-behavior: smooth;
+      overflow-anchor: none;
     }
 
     /* Document Panel */
@@ -213,15 +213,58 @@
     .message-body pre {
       background: #090d16;
       border: 1px solid var(--border-color);
-      padding: 10px;
+      padding: 12px;
       border-radius: 6px;
       overflow-x: auto;
       margin: 0.6em 0;
+      position: relative;
     }
     .message-body pre code {
       background: transparent;
       padding: 0;
       color: #cbd5e1;
+    }
+
+    pre {
+      position: relative;
+    }
+
+    .copy-code-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(30, 41, 59, 0.85);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      font-family: var(--font-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(4px);
+      opacity: 0.7;
+      z-index: 5;
+      user-select: none;
+    }
+
+    pre:hover .copy-code-btn {
+      opacity: 1;
+    }
+
+    .copy-code-btn:hover {
+      background: #334155;
+      color: #f1f5f9;
+      border-color: var(--accent-blue);
+    }
+
+    .copy-code-btn.copied {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: #10b981;
+      color: #34d399;
     }
 
     .message.user {
@@ -743,8 +786,10 @@
 
               if (event.type === "message_start") {
                 currentAssistantText = "";
+                userScrolledUp = false;
                 currentAssistantEl = appendMessage("assistant", event.name, event.role, "", event.model);
                 if (thinkingText) thinkingText.textContent = `${event.name} (${event.role}) vastaa... [${event.model || ''}]`;
+                scrollChatToBottom(true);
               } else if (event.type === "token") {
                 currentAssistantText += event.text;
                 updateStreamingMessage(currentAssistantEl, currentAssistantText);
@@ -753,9 +798,11 @@
               } else if (event.type === "error") {
                 console.error("Virhe palvelimelta:", event.text);
                 appendMessage("assistant", event.name || "Virhe", "Järjestelmävirhe", `⚠️ ${event.text}`);
+                scrollChatToBottom(true);
               } else if (event.type === "message_done") {
                 if (currentAssistantEl) {
                   updateStreamingMessage(currentAssistantEl, currentAssistantText);
+                  addCopyButtonsToCodeBlocks(currentAssistantEl);
                 }
                 conversation.push({
                   role: "assistant",
@@ -763,6 +810,7 @@
                   content: currentAssistantText
                 });
                 saveState();
+                scrollChatToBottom(true);
               } else if (event.type === "usage") {
                 recordUsage(event.model, event.usage);
                 saveState();
@@ -827,6 +875,9 @@
         <div class="message-body ${text ? 'rendered-md' : ''}">${renderedContent}</div>
       `;
       chat.appendChild(msg);
+      if (text) {
+        addCopyButtonsToCodeBlocks(msg);
+      }
       scrollChatToBottom();
       return msg;
     }
@@ -861,6 +912,7 @@
     }
 
     let userScrolledUp = false;
+    let isProgrammaticScroll = false;
 
     // Kuunnellaan käyttäjän omaa vieritystä
     function initScrollListener() {
@@ -868,15 +920,18 @@
       if (!chat) return;
       
       chat.addEventListener("scroll", () => {
-        // Jos käyttäjä on vierittänyt yli 30px ylöspäin pohjalta, asetetaan autoscroll pauselle
+        if (isProgrammaticScroll) {
+          isProgrammaticScroll = false;
+          return;
+        }
+        // Jos käyttäjä on vierittänyt yli 60px ylöspäin pohjalta, asetetaan autoscroll pauselle
         const distanceFromBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight;
-        if (distanceFromBottom > 30) {
+        const resumeBtn = document.getElementById("resume-scroll-btn");
+        if (distanceFromBottom > 60) {
           userScrolledUp = true;
-          const resumeBtn = document.getElementById("resume-scroll-btn");
-          if (resumeBtn) resumeBtn.style.display = "inline-block";
+          if (resumeBtn) resumeBtn.style.display = "inline-flex";
         } else {
           userScrolledUp = false;
-          const resumeBtn = document.getElementById("resume-scroll-btn");
           if (resumeBtn) resumeBtn.style.display = "none";
         }
       }, { passive: true });
@@ -890,9 +945,10 @@
     }
 
     function scrollChatToBottom(force = false) {
-      if (userScrolledUp && !force) return; // Älä vieritä väkisin jos käyttäjä lukee vanhoja viestejä!
+      if (userScrolledUp && !force) return;
       const chat = document.getElementById("chat-messages");
       if (!chat) return;
+      isProgrammaticScroll = true;
       chat.scrollTop = chat.scrollHeight;
     }
 
@@ -911,11 +967,60 @@
             } else {
               contentEl.textContent = latestDocMarkdown;
             }
+            addCopyButtonsToCodeBlocks(contentEl);
           }
           docRenderPending = false;
         });
       }
     }
+
+    // Lisää Kopioi-nappi kaikkiin koodilohkoihin (pre)
+    function addCopyButtonsToCodeBlocks(container) {
+      if (!container) return;
+      const pres = container.querySelectorAll("pre");
+      pres.forEach(pre => {
+        if (!pre.querySelector(".copy-code-btn")) {
+          pre.style.position = "relative";
+          const btn = document.createElement("button");
+          btn.className = "copy-code-btn";
+          btn.type = "button";
+          btn.innerHTML = "📋 Kopioi";
+          btn.title = "Kopioi koodi leikepöydälle";
+          pre.appendChild(btn);
+        }
+      });
+    }
+
+    // Globaali tapahtumankuuntelija koodin leikepöydälle kopioinnille
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest(".copy-code-btn");
+      if (!btn) return;
+      const pre = btn.closest("pre");
+      if (!pre) return;
+
+      const code = pre.querySelector("code");
+      let textToCopy = "";
+      if (code) {
+        textToCopy = code.innerText;
+      } else {
+        const clone = pre.cloneNode(true);
+        const btnInClone = clone.querySelector(".copy-code-btn");
+        if (btnInClone) btnInClone.remove();
+        textToCopy = clone.innerText;
+      }
+
+      navigator.clipboard.writeText(textToCopy.trim()).then(() => {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "✅ Kopioitu!";
+        btn.classList.add("copied");
+        setTimeout(() => {
+          btn.innerHTML = originalText;
+          btn.classList.remove("copied");
+        }, 2000);
+      }).catch(err => {
+        console.error("Kopiointi epäonnistui:", err);
+      });
+    });
 
     function exportMarkdown() {
       if (!currentDocument) return;

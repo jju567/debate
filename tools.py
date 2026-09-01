@@ -6,9 +6,13 @@ import tempfile
 import contextlib
 from pathlib import Path
 
-# Työkansio skripteille
+# Työkansiot
 SCRIPTS_DIR = Path(__file__).parent / "scripts"
 SCRIPTS_DIR.mkdir(exist_ok=True)
+WORK_DIR = Path(__file__).parent / "work"
+WORK_DIR.mkdir(exist_ok=True)
+RESULTS_DIR = Path(__file__).parent / "results"
+RESULTS_DIR.mkdir(exist_ok=True)
 
 # Pysyvä muistitila kevyille kokeiluille (In-Memory REPL)
 _REPL_GLOBALS = {
@@ -164,17 +168,17 @@ START_BACKGROUND_JOB_TOOL = {
     "type": "function",
     "function": {
         "name": "start_background_job",
-        "description": "Käynnistä raskas laskenta, kvantitatiivinen simulaatio, datan prosessointi tai pitkäkestoinen Python-skripti taustalle ilman aikarajaa. Palauttaa job_id:n.",
+        "description": "Käynnistä raskas laskenta, kvantitatiivinen simulaatio, datan prosessointi tai pitkäkestoinen Python-skripti taustalle ilman aikarajaa. Anna 'code'-parametrina aina täydellinen, itsenäinen Python-koodi. Kirjoita tulokset ja raportit 'results/'-kansioon (esim. 'results/sharpe.json'). Palauttaa job_id:n.",
         "parameters": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "string",
-                    "description": "Suoritettava Python-koodi."
+                    "description": "Täydellinen ja itsenäinen suoritettava Python-lähdekoodi (sisältää importit, datan lukemisen ja tulosten tulostuksen/tallennuksen 'results/'-kansioon)."
                 },
                 "name": {
                     "type": "string",
-                    "description": "Laskennan kuvaava nimi (esim. 'volatiliteetti_simulaatio' tai 'data_aggregaatio')."
+                    "description": "Laskennan kuvaava nimi (esim. 'regime_analysis' tai 'har_rv_model')."
                 }
             },
             "required": ["code"]
@@ -217,13 +221,13 @@ WRITE_LOCAL_FILE_TOOL = {
     "type": "function",
     "function": {
         "name": "write_local_file",
-        "description": "Luo tai tallenna koodi, skripti tai tiedosto paikalliseen polkuun (esim. 'work/analyysi.py' tai 'scripts/my_script.py'). Luo tarvittavat kansiot automaattisesti.",
+        "description": "Luo tai tallenna koodi, skripti tai tulostiedosto. SÄÄNTÖ: Tallenna kaikki koodit ja skriptit AINA projektin 'work/'-kansioon (esim. 'work/analyysi.py') ja kaikki laskenta-, simulaatio- ja analyysitulokset AINA 'results/'-kansioon (esim. 'results/tulos.json'). Älä käytä tilapäishakemistoja.",
         "parameters": {
             "type": "object",
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Tiedoston tallennuspolku (suhteellinen tai absoluuttinen, esim. 'work/polars2.py')."
+                    "description": "Tiedoston tallennuspolku (esim. 'work/analyysi.py' koodille tai 'results/tulos.json' tuloksille)."
                 },
                 "content": {
                     "type": "string",
@@ -424,14 +428,24 @@ def run_python_code(code: str, timeout_sec: int = 15) -> dict:
         temp_file_path = tf.name
 
     try:
-        # Käytetään sääntöjen mukaista Windows 'py' -komentoa
-        result = subprocess.run(
-            ["py", "-3", temp_file_path],
-            capture_output=True,
-            text=True,
-            timeout=timeout_sec,
-            cwd=str(Path(__file__).parent)
-        )
+        # Kokeillaan ensin 'py -3', ja jos ei löydy, käytetään 'python'
+        cmd = ["py", "-3", temp_file_path]
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+                cwd=str(Path(__file__).parent)
+            )
+        except FileNotFoundError:
+            result = subprocess.run(
+                ["python", temp_file_path],
+                capture_output=True,
+                text=True,
+                timeout=timeout_sec,
+                cwd=str(Path(__file__).parent)
+            )
         stdout = result.stdout.strip()
         stderr = result.stderr.strip()
         return {

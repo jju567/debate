@@ -1,0 +1,7 @@
+HAR-RV Model Summary (3v 5min BTCUSDT)
+Observations: 297,939
+Alpha: 0.000014
+Beta Daily: 0.9996
+Beta Weekly: -0.0002
+Beta Monthly: 0.0001
+R2: 0.9989

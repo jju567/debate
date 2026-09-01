@@ -1,0 +1,66 @@
+{
+  "z_2.0": {
+    "taker": {
+      "n_trades": 4658,
+      "win_rate": 0.5652640618291112,
+      "gross_sharpe": 1.2271778201841819,
+      "net_sharpe": 1.222061565455154,
+      "avg_trade_return": -0.03593331976116008
+    },
+    "maker": {
+      "n_trades": 4658,
+      "win_rate": 0.5656934306569343,
+      "gross_sharpe": 1.2271778201841819,
+      "net_sharpe": 1.223766987048711,
+      "avg_trade_return": -0.0349333197611601
+    }
+  },
+  "z_2.5": {
+    "taker": {
+      "n_trades": 1607,
+      "win_rate": 0.5556938394523958,
+      "gross_sharpe": 0.5108620171391618,
+      "net_sharpe": 0.5078066384300152,
+      "avg_trade_return": -0.1279636066876292
+    },
+    "maker": {
+      "n_trades": 1607,
+      "win_rate": 0.5569383945239577,
+      "gross_sharpe": 0.5108620171391618,
+      "net_sharpe": 0.508825098794774,
+      "avg_trade_return": -0.1269636066876291
+    }
+  },
+  "z_3.0": {
+    "taker": {
+      "n_trades": 498,
+      "win_rate": 0.5783132530120482,
+      "gross_sharpe": 0.8407260289872296,
+      "net_sharpe": 0.8389776090837698,
+      "avg_trade_return": 0.05508709494434995
+    },
+    "maker": {
+      "n_trades": 498,
+      "win_rate": 0.5803212851405622,
+      "gross_sharpe": 0.8407260289872296,
+      "net_sharpe": 0.8395604187988321,
+      "avg_trade_return": 0.056087094944350005
+    }
+  },
+  "z_3.5": {
+    "taker": {
+      "n_trades": 143,
+      "win_rate": 0.5874125874125874,
+      "gross_sharpe": 0.6933928567637448,
+      "net_sharpe": 0.692445982779696,
+      "avg_trade_return": -0.04934565437052337
+    },
+    "maker": {
+      "n_trades": 143,
+      "win_rate": 0.5944055944055944,
+      "gross_sharpe": 0.6933928567637448,
+      "net_sharpe": 0.6927616097444151,
+      "avg_trade_return": -0.048345654370523315
+    }
+  }
+}

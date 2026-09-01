@@ -47,11 +47,12 @@ STATIC_DIR = Path(__file__).parent / "static"
 # ---------- Kehotepohjat ----------
 
 AGENT_TOOL_INSTRUCTIONS = (
-    "\n\nTYÖKALU- JA TALLENNUSOHJEET:\n"
-    "- Tiedostojen tallennus: Käytä aina 'write_local_file(path, content)' skriptien tallentamiseen levylle (esim. 'work/analyysi.py').\n"
+    "\n\nTYÖKALU-, KANSIO- JA TALLENNUSSÄÄNNÖT (EHDOTTOMAT):\n"
+    "- Kooditiedostot ja skriptit: Tallenna AINA projektin 'work/'-kansioon käyttäen 'write_local_file' (esim. 'work/analyysi.py'). ÄLÄ KOSKAAN luo skriptejä minne sattuu tai tilapäiskansioihin.\n"
+    "- Tulokset ja raportit: Tallenna kaikki laskenta-, simulaatio- ja analyysitulokset, raportit ja data AINA projektin 'results/'-kansioon (esim. 'results/sharpe_raportti.json', 'results/tulos.csv', 'results/yhteenveto.txt'). ÄLÄ tallenna tuloksia temp-kansioihin.\n"
     "- Koodin suoritus:\n"
     "  * Pikatestit (< 10s): Käytä 'execute_python(code)' tai 'eval_python_expression(code_or_expr)'.\n"
-    "  * Raskaat laskennat ja iso data (Polars, Parquet, simulaatiot > 10s): Käytä AINA 'start_background_job(code, name)'. Se ei aikakatkea.\n"
+    "  * Raskaat laskennat ja iso data (Polars, Parquet, simulaatiot > 10s): Käytä AINA 'start_background_job(code, name)'. Anna täydellinen koodi ja tallenna tulostiedostot 'results/'-kansioon.\n"
     "- Tiedostojen luku: 'read_local_file(path)' tai 'list_local_directory(path)'."
 )
 
@@ -303,27 +304,7 @@ async def respond(req: RespondRequest):
                         # Ilmoitetaan että malli analysoi tuloksia
                         yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n💬 *[Analysoidaan tulosta...]*\n\n"})
 
-                    # 2. Automaattinen suoritus koodilohkoille jos malli kirjoitti suoraan ```python:
-                    full_text_so_far = "".join(parts)
-                    code_blocks = re.findall(r"```python\s*(.*?)\s*```", full_text_so_far, re.DOTALL)
-                    already_handled = any(marker in full_text_so_far for marker in [
-                        "⚡ **Koodin ajotulos", "⚡ *[Suoritetaan työkalua", "💾 **[Tiedosto tallennettu", "🚀 **[Taustalaskenta"
-                    ])
-                    if code_blocks and not already_handled:
-                        last_code = code_blocks[-1].strip()
-                        is_heavy = any(kw in last_code for kw in ["read_parquet", "scan_parquet", "start_background_job", "time.sleep", "glob.glob"])
-                        if len(last_code) > 0 and len(last_code) < 50000 and not is_heavy:
-                            yield sse({"type": "token", "id": p.id, "name": p.name, "text": "\n\n⚡ *[Ajetaan koodia automaattisesti...]*\n"})
-                            res = run_python_code(last_code, timeout_sec=10)
-                            if res["output"] and res["output"] != "(ei tulostetta)":
-                                exec_banner = f"\n\n⚡ **Koodin ajotulos:**\n```\n{res['output']}\n```\n"
-                                parts.append(exec_banner)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": exec_banner})
-                            elif res.get("stderr"):
-                                exec_banner = f"\n\n⚠️ **Koodin suoritusvirhe:**\n```\n{res['stderr']}\n```\n"
-                                parts.append(exec_banner)
-                                yield sse({"type": "token", "id": p.id, "name": p.name, "text": exec_banner})
-
+                    # Agentin vastauskierros valmis (koodien automaattinen 10s väkisinsuoritus poistettu, jotta raskaat ajot eivät katkea)
                 except LLMError as e:
                     err = f"[Virhe osallistujalta {p.name}: {e}]"
                     parts.append(err)

@@ -1,0 +1,44 @@
+{
+  "window_1": {
+    "n_trades": 52,
+    "win_rate": 0.7692307692307693,
+    "gross_sharpe": 0.7408128152627277,
+    "net_sharpe": 0.7399193826319582,
+    "avg_trade_return": 1.2915560028073665
+  },
+  "window_2": {
+    "n_trades": 208,
+    "win_rate": 0.6634615384615384,
+    "gross_sharpe": 0.9516413712930468,
+    "net_sharpe": 0.9496733168218165,
+    "avg_trade_return": -0.22159545140920073
+  },
+  "window_3": {
+    "n_trades": 0,
+    "win_rate": NaN,
+    "gross_sharpe": NaN,
+    "net_sharpe": NaN,
+    "avg_trade_return": NaN
+  },
+  "window_4": {
+    "n_trades": 0,
+    "win_rate": NaN,
+    "gross_sharpe": NaN,
+    "net_sharpe": NaN,
+    "avg_trade_return": NaN
+  },
+  "window_5": {
+    "n_trades": 0,
+    "win_rate": NaN,
+    "gross_sharpe": NaN,
+    "net_sharpe": NaN,
+    "avg_trade_return": NaN
+  },
+  "window_6": {
+    "n_trades": 0,
+    "win_rate": NaN,
+    "gross_sharpe": NaN,
+    "net_sharpe": NaN,
+    "avg_trade_return": NaN
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "walk_forward": {
+    "window_1": {
+      "n_trades": 167,
+      "win_rate": 0.6167664670658682,
+      "gross_sharpe": 1.0561133861045753,
+      "net_sharpe": 1.0497061953469635,
+      "avg_trade": 0.5734138131207877,
+      "total_pnl": 95.76010679117154,
+      "selected_z": 3.0
+    },
+    "window_2": {
+      "n_trades": 58,
+      "win_rate": 0.5344827586206896,
+      "gross_sharpe": -1.6053031005719987,
+      "net_sharpe": -1.6102972798993662,
+      "avg_trade": -1.1285218471757963,
+      "total_pnl": -65.45426713619618,
+      "selected_z": 3.5
+    }
+  },
+  "bootstrap_z3.0": {
+    "z": 3.0,
+    "mean_sharpe": 0.007144892857557386,
+    "ci_95_low": -0.6341554792318457,
+    "ci_95_high": 0.660334752098724,
+    "prob_positive": 0.5046
+  },
+  "bootstrap_z3.5": {
+    "z": 3.5,
+    "mean_sharpe": 0.06002288741900843,
+    "ci_95_low": -1.1067568954473035,
+    "ci_95_high": 1.2943564790816953,
+    "prob_positive": 0.537
+  },
+  "parameters": {
+    "taker_fee": 0.0025,
+    "slippage": 0.0005,
+    "spread": 0.0005,
+    "total_cost_per_trade": 0.0035,
+    "hold_bars": 12,
+    "rv_window": 288,
+    "z_window": 2016
+  }
+}

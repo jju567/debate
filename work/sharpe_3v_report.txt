@@ -1,0 +1,7 @@
+SHARPE ANALYSIS REPORT (3-YEAR 5MIN BTCUSDT)
+Observations: 306,578
+Active Signals: 7,593 (2.48%)
+Total Trades: 13,714
+Gross Sharpe: 1.7253
+Maker Net Sharpe (0.15%): -39.5644
+Taker Net Sharpe (0.25%): -50.9838

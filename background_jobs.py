@@ -47,15 +47,25 @@ def start_background_job(code: str, name: str = "laskenta") -> dict:
     def _runner():
         with open(log_path, "w", encoding="utf-8") as lf:
             try:
-                # Sääntöjen mukainen Windows 'py -3' suoritus
-                proc = subprocess.Popen(
-                    ["py", "-3", str(script_path)],
-                    stdout=lf,
-                    stderr=subprocess.STDOUT,
-                    stdin=subprocess.DEVNULL,
-                    cwd=str(Path(__file__).parent),
-                    text=True,
-                )
+                # Kokeillaan ensin 'py -3', ja jos ei löydy, käytetään 'python'
+                try:
+                    proc = subprocess.Popen(
+                        ["py", "-3", str(script_path)],
+                        stdout=lf,
+                        stderr=subprocess.STDOUT,
+                        stdin=subprocess.DEVNULL,
+                        cwd=str(Path(__file__).parent),
+                        text=True,
+                    )
+                except FileNotFoundError:
+                    proc = subprocess.Popen(
+                        ["python", str(script_path)],
+                        stdout=lf,
+                        stderr=subprocess.STDOUT,
+                        stdin=subprocess.DEVNULL,
+                        cwd=str(Path(__file__).parent),
+                        text=True,
+                    )
                 proc.wait()
                 job_info["returncode"] = proc.returncode
                 job_info["status"] = "completed" if proc.returncode == 0 else "failed"

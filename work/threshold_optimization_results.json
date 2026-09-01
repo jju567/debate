@@ -1,0 +1,30 @@
+[
+    {
+        "threshold": 2.0,
+        "total_trades": 6882,
+        "win_rate": 0.0,
+        "gross_sharpe": -70555.8402,
+        "net_sharpe": -13852206653.6363
+    },
+    {
+        "threshold": 2.5,
+        "total_trades": 5760,
+        "win_rate": 0.0,
+        "gross_sharpe": -98487.2547,
+        "net_sharpe": -13637569548.4508
+    },
+    {
+        "threshold": 3.0,
+        "total_trades": 5586,
+        "win_rate": 0.0,
+        "gross_sharpe": -99965.3458,
+        "net_sharpe": -13035439503.1071
+    },
+    {
+        "threshold": 3.5,
+        "total_trades": 5325,
+        "win_rate": 0.0,
+        "gross_sharpe": -100236.3471,
+        "net_sharpe": -11902815627.0216
+    }
+]

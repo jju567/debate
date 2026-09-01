@@ -5,6 +5,8 @@
 
 ## Projektirakenne & Kansiojako
 - Käytä selkeitä alikansioita erittelemään eri osiot, moduulit, skriptit ja testit (esim. `tests/`, `scripts/`, `src/` tai domain-kohtaiset alikansiot) projektin koon kasvaessa.
+- **Kooditiedostot ja skriptit**: Kaikki uudet ja muokatut koodit/skriptit sijoitetaan **AINA** projektin juuren `work/`-kansioon (esim. `work/analyysi.py`). Älä koskaan luo koodeja satunnaisiin kansioihin tai temp-hakemistoihin.
+- **Tulokset ja raportit**: Kaikki laskenta-, simulaatio- ja analyysitulokset, raportit ja exportit sijoitetaan **AINA** projektin juuren `results/`-kansioon (esim. `results/sharpe_raportti.json`). Älä tallenna tuloksia temp-kansioihin.
 
 ## Python Suoritus & Testaus (Windows)
 - **AINA** käytetään komentoa **`py`** Python-skriptien suorittamiseen (esim. `py main.py`, `py -m uvicorn main:app`). Komento `python` tai `pytest` ei ole suoraan PATH-muuttujassa tässä ympäristössä.
